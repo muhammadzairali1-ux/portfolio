@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nimbus — A/B Test Reports</title>
+<style>
+/* ============ DESIGN TOKENS ============ */
+:root {
+  --bg: #F6F3EC;
+  --bg-alt: #EFEADC;
+  --surface: #FFFFFF;
+  --surface-2: #FBF9F2;
+  --border: #E3DCCA;
+  --border-strong: #C9BFA5;
+  --ink: #1A1611;
+  --ink-2: #4A4337;
+  --ink-3: #857C6A;
+  --ink-4: #B8AE95;
+
+  --engagement: #1E3A8A;
+  --engagement-soft: #DBE4F5;
+  --progression: #5B21B6;
+  --progression-soft: #E5DBF5;
+  --economy: #065F46;
+  --economy-soft: #CDE5DB;
+  --monetization: #0F766E;
+  --monetization-soft: #CCFBF1;
+  --cash: #059669;
+  --energy: #CA8A04;
+
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Monaco, 'Cascadia Code', 'Courier New', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Paper-texture-ish atmosphere */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(ellipse at top left, rgba(181, 159, 110, 0.06), transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(100, 120, 140, 0.04), transparent 50%);
+  z-index: 0;
+}
+
+.app { position: relative; z-index: 1; max-width: 1680px; margin: 0 auto; padding: 32px 40px 80px; }
+
+/* ============ HEADER ============ */
+.masthead { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 18px; border-bottom: 1.5px solid var(--ink); margin-bottom: 24px; }
+.masthead .brand { display: flex; align-items: baseline; gap: 22px; }
+.masthead h1 { font-family: var(--font-display); font-weight: 600; font-size: 34px; letter-spacing: -0.02em; line-height: 1.1; }
+.masthead h1 em { font-style: normal; font-weight: 400; color: var(--ink-2); }
+.masthead .issue { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-3); }
+.masthead .tagline { text-align: right; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+.masthead .tagline strong { display: block; font-family: var(--font-display); font-size: 14px; color: var(--ink); letter-spacing: 0; text-transform: none; font-weight: 600; margin-bottom: 2px; }
+
+/* ============ FILTER BAR ============ */
+.filter-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 0 rgba(26, 22, 17, 0.03);
+  position: sticky;
+  top: 8px;
+  z-index: 60;
+}
+.filter-bar-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 12px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.filter-bar-label .actions { display: flex; gap: 12px; }
+.filter-bar-label button {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--ink-2); padding: 0;
+  border-bottom: 1px dotted var(--ink-3);
+}
+.filter-bar-label button:hover { color: var(--ink); border-bottom-style: solid; }
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px 14px;
+}
+.filter {
+  position: relative;
+  display: flex; flex-direction: column; gap: 4px;
+  min-width: 0;
+}
+.filter > label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  display: flex; justify-content: space-between;
+}
+.filter > label .hint {
+  text-transform: none; letter-spacing: 0; font-size: 9.5px; color: var(--ink-4);
+}
+
+/* Trigger button that opens dropdown */
+.filter-trigger {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 7px 10px;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  min-height: 32px;
+  transition: border-color .15s, background .15s;
+}
+.filter-trigger:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface); }
+.filter-trigger:disabled { opacity: 0.4; cursor: not-allowed; }
+.filter-trigger .chevron { color: var(--ink-3); font-size: 10px; }
+.filter-trigger .selection { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.filter-trigger.active { border-color: var(--ink); background: var(--surface); }
+
+/* Popover dropdown */
+.filter-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  padding: 6px;
+  min-width: 100%;
+  box-shadow: 0 12px 28px rgba(26, 22, 17, 0.14), 0 2px 6px rgba(26, 22, 17, 0.06);
+  max-height: 280px; overflow-y: auto;
+  display: none;
+}
+.filter-panel.open { display: block; }
+.filter-panel .opt {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px;
+  border-radius: 2px;
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+}
+.filter-panel .opt:hover { background: var(--bg-alt); }
+.filter-panel .opt input { accent-color: var(--ink); }
+.filter-panel .opt .count { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-3); }
+
+/* Date range */
+.date-range { display: flex; gap: 6px; align-items: center; }
+.date-range input[type=date] {
+  background: var(--bg-alt); border: 1px solid var(--border); border-radius: 3px;
+  padding: 6px 8px; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink);
+  min-height: 32px; flex: 1; min-width: 0;
+}
+.date-range input[type=date]:focus { outline: none; border-color: var(--ink); background: var(--surface); }
+.date-range .sep { color: var(--ink-3); font-family: var(--font-mono); font-size: 11px; }
+
+/* Segmented toggle */
+.seg {
+  display: inline-flex;
+  background: var(--bg-alt); border: 1px solid var(--border); border-radius: 3px;
+  padding: 2px; gap: 2px;
+}
+.seg button {
+  flex: 1;
+  background: transparent; border: none; padding: 5px 0;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-2); cursor: pointer; border-radius: 2px;
+}
+.seg button:hover { color: var(--ink); }
+.seg button.on { background: var(--ink); color: var(--bg); }
+
+/* ============ COHORT STRIP ============ */
+.cohort-strip {
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 4px;
+  padding: 14px 22px;
+  margin-bottom: 14px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  align-items: center;
+}
+.cohort-strip .stat .label {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--ink-4); margin-bottom: 3px;
+}
+.cohort-strip .stat .value {
+  font-family: var(--font-display); font-weight: 600;
+  font-size: 20px; color: var(--bg); letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.cohort-strip .stat .value .unit {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink-4); margin-left: 4px;
+}
+
+/* ============ A/B STRIP ============ */
+.ab-strip {
+  background: var(--surface);
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+  margin-bottom: 18px;
+  padding: 16px 20px 20px;
+  display: none;
+}
+.ab-strip.show { display: block; }
+.ab-strip .ab-header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding-bottom: 12px; margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.ab-strip h3 {
+  font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.01em;
+}
+.ab-strip h3 .tag {
+  display: inline-block;
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 600; letter-spacing: 0.2em;
+  text-transform: uppercase; background: var(--ink); color: var(--bg);
+  padding: 3px 7px; vertical-align: middle; margin-right: 10px;
+  border-radius: 2px;
+}
+.ab-strip .test-name {
+  font-family: var(--font-mono); font-size: 13px; color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.ab-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ab-table th, .ab-table td {
+  text-align: right; padding: 8px 12px;
+  font-variant-numeric: tabular-nums; font-family: var(--font-mono);
+}
+.ab-table th:first-child, .ab-table td:first-child {
+  text-align: left; font-family: var(--font-body); font-weight: 500;
+}
+.ab-table thead th {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--ink-3); font-weight: 500;
+  border-bottom: 1px solid var(--border); padding-bottom: 10px;
+}
+.ab-table thead th.control-col { color: var(--ink); }
+.ab-table tbody tr { border-bottom: 1px dotted var(--border); }
+.ab-table tbody tr:last-child { border-bottom: none; }
+.ab-table .delta { font-size: 10.5px; display: block; color: var(--ink-3); margin-top: 2px; }
+.ab-table .delta.pos { color: var(--monetization); }
+.ab-table .delta.neg { color: #B91C1C; }
+
+/* ============ SECTIONS ============ */
+.section { margin-top: 32px; }
+.section-head {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  margin-bottom: 16px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--ink);
+  position: relative;
+}
+.section-head::after {
+  content: ''; position: absolute; bottom: -2.5px; left: 0;
+  width: 64px; height: 4px; background: var(--section-color, var(--ink));
+}
+.section-head .num {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 2px;
+}
+.section-head h2 {
+  font-family: var(--font-display); font-weight: 600; font-size: 26px;
+  letter-spacing: -0.02em; line-height: 1.15;
+}
+.section-head h2 em { font-style: normal; font-weight: 400; color: var(--ink-2); }
+.section-head .meta {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--ink-3); text-align: right;
+  max-width: 380px;
+}
+
+/* Section color variables */
+.section.engagement    { --section-color: var(--engagement);    --section-soft: var(--engagement-soft); }
+.section.progression   { --section-color: var(--progression);   --section-soft: var(--progression-soft); }
+.section.economy       { --section-color: var(--economy);       --section-soft: var(--economy-soft); }
+.section.monetization  { --section-color: var(--monetization);  --section-soft: var(--monetization-soft); }
+
+/* ============ KPI CARDS ============ */
+.kpi-row { display: grid; gap: 10px; margin-bottom: 14px; }
+.kpi-row.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.kpi-row.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.kpi-row.cols-5 { grid-template-columns: repeat(5, 1fr); }
+.kpi-row.cols-6 { grid-template-columns: repeat(6, 1fr); }
+
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 14px 16px 12px;
+  position: relative;
+  overflow: hidden;
+}
+.kpi::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--section-color);
+}
+.kpi .kpi-label {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--ink-3);
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;
+  min-height: 24px;
+}
+.kpi .kpi-label .info { color: var(--ink-4); font-size: 10px; }
+.kpi .kpi-value {
+  font-family: var(--font-display);
+  font-weight: 600; font-size: 28px; line-height: 1.1; letter-spacing: -0.02em;
+  color: var(--ink); margin: 2px 0 2px;
+  font-variant-numeric: tabular-nums;
+}
+.kpi .kpi-value.small { font-size: 22px; }
+.kpi .kpi-value .unit {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.05em; color: var(--ink-3); margin-left: 2px;
+  text-transform: lowercase;
+}
+.kpi .kpi-sub {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-2);
+  font-variant-numeric: tabular-nums; margin-top: 4px;
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.kpi .kpi-sub span { white-space: nowrap; }
+.kpi .kpi-sub b { color: var(--ink); font-weight: 600; }
+
+/* ============ CHART CARDS ============ */
+.chart-grid { display: grid; gap: 10px; margin-bottom: 14px; }
+.chart-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+.chart-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.chart-grid.cols-21 { grid-template-columns: 2fr 1fr; }
+.chart-grid.cols-12 { grid-template-columns: 1fr 2fr; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 14px 16px 12px;
+  display: flex; flex-direction: column; min-height: 0;
+}
+.card-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 10px; gap: 12px;
+}
+.card-head h4 {
+  font-family: var(--font-display); font-size: 14px; font-weight: 600;
+  letter-spacing: -0.01em; color: var(--ink);
+}
+.card-head h4 em { font-style: normal; font-weight: 400; color: var(--ink-2); }
+.card-head .card-meta {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.card-body { flex: 1; position: relative; min-height: 0; }
+.chart-wrap { position: relative; height: 220px; }
+.chart-wrap.tall { height: 280px; }
+.chart-wrap.short { height: 160px; }
+
+.caption {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
+  color: var(--ink-3); margin-top: 8px; line-height: 1.4;
+}
+
+/* ============ SINKS TABLE ============ */
+.sinks-table {
+  width: 100%; border-collapse: collapse; font-size: 12.5px;
+}
+.sinks-table th, .sinks-table td {
+  padding: 7px 10px; text-align: right;
+  font-variant-numeric: tabular-nums; font-family: var(--font-mono);
+}
+.sinks-table th:first-child, .sinks-table td:first-child {
+  text-align: left; font-family: var(--font-body); font-weight: 500;
+}
+.sinks-table thead th {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--ink-3); font-weight: 500;
+  border-bottom: 1px solid var(--border); padding-bottom: 8px;
+}
+.sinks-table tbody tr { border-bottom: 1px dotted var(--border); }
+.sinks-table tbody tr:last-child { border-bottom: none; }
+.sinks-table tbody tr:hover { background: var(--surface-2); }
+.sinks-table .swatch { display: inline-block; width: 10px; height: 10px; margin-right: 7px; vertical-align: middle; border-radius: 2px; }
+.sinks-table .bar-cell { width: 140px; }
+.sinks-table .bar-inline {
+  position: relative; height: 7px; background: var(--bg-alt); border-radius: 1px; overflow: hidden; margin-top: 4px;
+}
+.sinks-table .bar-inline > span {
+  position: absolute; inset: 0 auto 0 0; border-radius: 1px;
+}
+
+/* ============ FOOTER ============ */
+.colophon {
+  margin-top: 48px; padding-top: 18px;
+  border-top: 1px solid var(--border-strong);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.colophon strong { color: var(--ink-2); font-weight: 500; }
+
+/* ============ MISC ============ */
+.warning-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #FEF3C7; border: 1px solid #FCD34D;
+  color: #78350F;
+  padding: 4px 10px; border-radius: 2px;
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 500;
+  margin-left: 10px;
+}
+
+.muted { color: var(--ink-3); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Responsive */
+@media (max-width: 1280px) {
+  .filter-grid { grid-template-columns: repeat(3, 1fr); }
+  .kpi-row.cols-6 { grid-template-columns: repeat(3, 1fr); }
+  .kpi-row.cols-5 { grid-template-columns: repeat(3, 1fr); }
+  .kpi-row.cols-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 900px) {
+  .app { padding: 20px; }
+  .filter-grid { grid-template-columns: 1fr 1fr; }
+  .chart-grid.cols-2, .chart-grid.cols-3, .chart-grid.cols-21, .chart-grid.cols-12 { grid-template-columns: 1fr; }
+  .kpi-row.cols-3, .kpi-row.cols-4 { grid-template-columns: 1fr 1fr; }
+  .cohort-strip { grid-template-columns: 1fr 1fr; }
+}
+</style>
+
+<style>
+.test-tabs { display:flex; gap:4px; margin-bottom:20px; border-bottom:1.5px solid var(--ink); }
+.test-tab { background:var(--bg-alt); border:1px solid var(--border); border-bottom:none;
+  padding:11px 22px; font-family:var(--font-display); font-size:15px; font-weight:600;
+  letter-spacing:-0.01em; color:var(--ink-3); cursor:pointer; border-radius:4px 4px 0 0;
+  margin-bottom:-1.5px; transition:all .15s; }
+.test-tab:hover { color:var(--ink-2); background:var(--surface-2); }
+.test-tab.on { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+.test-tab .vtag { font-family:var(--font-mono); font-size:9px; letter-spacing:0.12em;
+  text-transform:uppercase; display:block; margin-top:2px; opacity:0.7; }
+.test-panel { display:none; }
+.test-panel.on { display:block; }
+.verdict-banner { display:flex; justify-content:space-between; align-items:center;
+  padding:14px 20px; border-radius:4px; margin-bottom:16px; border:1.5px solid; }
+.verdict-banner.roll { background:#ECFDF5; border-color:#10B981; }
+.verdict-banner.noroll { background:#FEF2F2; border-color:#EF4444; }
+.verdict-banner .vb-label { font-family:var(--font-mono); font-size:10px; letter-spacing:0.2em;
+  text-transform:uppercase; color:var(--ink-3); margin-bottom:3px; }
+.verdict-banner .vb-verdict { font-family:var(--font-display); font-size:20px; font-weight:600; letter-spacing:-0.01em; }
+.verdict-banner.roll .vb-verdict { color:#065F46; }
+.verdict-banner.noroll .vb-verdict { color:#991B1B; }
+.verdict-banner .vb-note { font-family:var(--font-body); font-size:12px; color:var(--ink-2);
+  max-width:620px; text-align:right; line-height:1.5; }
+.stat-table { width:100%; border-collapse:collapse; font-size:12px; background:var(--surface);
+  border:1px solid var(--border); border-radius:4px; overflow:hidden; margin-bottom:8px; }
+.stat-table th, .stat-table td { padding:9px 12px; text-align:right; font-family:var(--font-mono);
+  font-variant-numeric:tabular-nums; }
+.stat-table th:first-child, .stat-table td:first-child { text-align:left; font-family:var(--font-body); }
+.stat-table thead th { font-size:9px; letter-spacing:0.16em; text-transform:uppercase;
+  color:var(--ink-2); font-weight:600; border-bottom:1.5px solid var(--border-strong);
+  padding-bottom:10px; padding-top:10px; background:var(--bg-alt); }
+.stat-table tbody tr { border-bottom:1px solid var(--border); }
+.stat-table tbody tr:last-child { border-bottom:none; }
+.stat-table tbody tr:hover { background:var(--surface-2); }
+.stat-table tbody tr.primary-row { background:#FFFBEB; }
+.stat-table tbody tr.primary-row:hover { background:#FEF6DC; }
+.stat-table .uplift-pill { font-family:var(--font-mono); font-size:11px; font-weight:600;
+  padding:2px 8px; border-radius:3px; display:inline-block; font-variant-numeric:tabular-nums; }
+.stat-table .uplift-pill.up-pos { background:#D1FAE5; color:#065F46; }
+.stat-table .uplift-pill.up-neg { background:#FEE2E2; color:#B91C1C; }
+.stat-table .uplift-pill.up-flat { background:var(--bg-alt); color:var(--ink-3); }
+.stat-table .badge { font-family:var(--font-mono); font-size:9px; padding:2px 7px; border-radius:3px;
+  letter-spacing:0.1em; text-transform:uppercase; font-weight:600; }
+.stat-table .badge.sig { background:#10B981; color:#fff; }
+.stat-table .badge.signeg { background:#EF4444; color:#fff; }
+.stat-table .badge.ns { background:var(--bg-alt); color:var(--ink-3); }
+.stat-table .badge.gold { background:#F59E0B; color:#fff; }
+.cann-table { width:100%; border-collapse:collapse; font-size:11px; }
+.cann-table th, .cann-table td { padding:5px 8px; text-align:right; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.cann-table th:first-child, .cann-table td:first-child { text-align:left; font-family:var(--font-body); }
+.cann-table thead th { font-size:8.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-3); font-weight:500; border-bottom:1px solid var(--border); }
+.cann-table tbody tr { border-bottom:1px dotted var(--border); }
+.cann-table tbody tr:hover { background:var(--surface-2); }
+.cann-table .bar { display:inline-block; height:8px; border-radius:1px; vertical-align:middle; margin-right:5px; }
+.cann-table .pos { color:var(--economy); font-weight:600; }
+.cann-table .neg { color:#B91C1C; font-weight:600; }
+.cann-table .new { background:#D1FAE5; color:#065F46; font-size:8px; padding:1px 4px; border-radius:2px; letter-spacing:0.06em; }
+.cann-table .absent { background:#FEE2E2; color:#991B1B; font-size:8px; padding:1px 4px; border-radius:2px; letter-spacing:0.06em; }
+.cann-insight { background:#FFFBEB; border:1px solid #FDE68A; border-radius:3px; padding:11px 15px;
+  margin-bottom:12px; font-size:12px; line-height:1.7; color:var(--ink-2); }
+.cann-insight b { color:var(--ink); }
+.os-subhead { font-family:var(--font-display); font-size:15px; font-weight:600; margin:18px 0 8px;
+  padding-bottom:5px; border-bottom:1px solid var(--border); }
+.note-line { font-family:var(--font-mono); font-size:10px; color:var(--ink-3); margin-bottom:10px; letter-spacing:0.05em; }
+.cann-controls { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;
+  background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:12px 16px; }
+.cann-metric-toggle, .cann-placement-filter { display:flex; flex-direction:column; gap:6px; }
+.cann-metric-toggle { flex-direction:row; align-items:center; gap:6px; flex-wrap:wrap; }
+.cc-label { font-family:var(--font-mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--ink-3); margin-right:4px; }
+.cann-placement-filter { position:relative; }
+.cann-placement-filter .filter-panel { position:absolute; top:calc(100% + 4px); left:0; z-index:50;
+  background:var(--surface); border:1px solid var(--border-strong); border-radius:3px; padding:6px;
+  min-width:260px; box-shadow:0 12px 28px rgba(26,22,17,0.14); max-height:320px; overflow-y:auto; display:none; }
+.cann-placement-filter .filter-panel.open { display:block; }
+.cann-placement-filter .opt { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:2px; font-size:12px; cursor:pointer; }
+.cann-placement-filter .opt:hover { background:var(--bg-alt); }
+.cann-placement-filter .opt a { color:var(--monetization); text-decoration:none; }
+.cc-btn { background:var(--bg-alt); border:1px solid var(--border); border-radius:3px; padding:5px 11px;
+  font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.05em; color:var(--ink-2); cursor:pointer; }
+.cc-btn:hover { border-color:var(--border-strong); }
+.cc-btn.on { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+.cann-table tr.subhead th { font-size:8px; color:var(--ink-4); padding-top:2px; padding-bottom:6px; }
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header class="masthead">
+    <div class="brand">
+      <div>
+        <div class="issue">Nimbus · A/B Test Brief</div>
+        <h1>A/B Test <em>Report</em></h1>
+      </div>
+    </div>
+    <div class="tagline">
+      <strong>New-User Cohort · A/B Analysis</strong>
+    </div>
+  </header>
+
+  <div class="test-tabs" id="test-tabs">
+    <button class="test-tab on" data-test="EM" onclick="switchTest('EM')">Employee Management<span class="vtag">EMS Cashier Trial</span></button>
+    <button class="test-tab" data-test="HP" onclick="switchTest('HP')">Hot Products<span class="vtag">Bonus Activated</span></button>
+    <button class="test-tab" data-test="IA" onclick="switchTest('IA')">Intrusive Ads<span class="vtag">EF · PU · Android+iOS</span></button>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <div class="filter-bar-label">
+      <span>§ Filters · applied to all tiles in active test</span>
+      <div class="actions"><button id="reset-filters" onclick="resetFilters()">Reset</button></div>
+    </div>
+    <div class="filter-grid" style="grid-template-columns:repeat(2,1fr)">
+      <div class="filter" data-filter="country">
+        <label>01 · Country</label>
+        <button class="filter-trigger" type="button" onclick="togglePanel('country')"><span class="selection" id="sel-country">All countries</span><span class="chevron">▾</span></button>
+        <div class="filter-panel" id="panel-country"></div>
+      </div>
+      <div class="filter" data-filter="platform">
+        <label>02 · Platform <span class="hint">single · OS-wise analysis</span></label>
+        <button class="filter-trigger" type="button" onclick="togglePanel('platform')"><span class="selection" id="sel-platform">Android</span><span class="chevron">▾</span></button>
+        <div class="filter-panel" id="panel-platform"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COHORT STRIP -->
+  <div class="cohort-strip">
+    <div class="stat"><div class="label">Cohort size · Default</div><div class="value" id="stat-ctrl">—<span class="unit">users</span></div></div>
+    <div class="stat"><div class="label">Cohort size · Test</div><div class="value" id="stat-test">—<span class="unit">users</span></div></div>
+    <div class="stat"><div class="label">Primary metric</div><div class="value" id="stat-primary" style="font-size:16px">—</div></div>
+    <div class="stat"><div class="label">Sample sufficiency</div><div class="value" id="stat-suff" style="font-size:16px">—</div></div>
+  </div>
+
+  <!-- VERDICT BANNER -->
+  <div id="verdict-mount"></div>
+
+  <!-- A/B STRIP -->
+  <div class="ab-strip show" id="ab-strip">
+    <div class="ab-header">
+      <h3><span class="tag">A/B</span> <span id="ab-test-label">—</span></h3>
+      <div class="test-name" id="ab-test-meta">—</div>
+    </div>
+    <div style="overflow-x:auto"><table class="ab-table" id="ab-table"></table></div>
+  </div>
+
+  <!-- MONETIZATION SECTION -->
+  <section class="section monetization">
+    <div class="section-head">
+      <div><div class="num">§ 01 — Monetization</div><h2>Revenue, <em>conversion &amp; LTV</em></h2></div>
+      <div class="meta">Per-user revenue, IAP conversion<br>and 7-day LTV proxy.</div>
+    </div>
+    <div class="kpi-row cols-5" id="mon-kpis"></div>
+    <div class="chart-grid">
+      <div class="card"><div class="card-head"><h4>Revenue per User <em>by group</em></h4><div class="card-meta" id="rev-meta">—</div></div>
+        <div class="card-body"><div class="chart-wrap"><canvas id="ch-rev"></canvas></div></div>
+        <div class="caption">IAP, Ad &amp; Total revenue per user. Test vs Default.</div></div>
+      <div class="card"><div class="card-head"><h4>LTV-7 <em>per user</em></h4><div class="card-meta" id="ltv-meta">—</div></div>
+        <div class="card-body"><div class="chart-wrap"><canvas id="ch-ltv"></canvas></div></div>
+        <div class="caption">7-day lifetime value per user, by group &amp; country.</div></div>
+    </div>
+  </section>
+
+  <!-- ENGAGEMENT SECTION -->
+  <section class="section engagement">
+    <div class="section-head">
+      <div><div class="num">§ 02 — Engagement &amp; Retention</div><h2>Return rates &amp; <em>progression</em></h2></div>
+      <div class="meta">D1 / D3 / D7 retention<br>and Level 10 completion.</div>
+    </div>
+    <div class="kpi-row cols-4" id="eng-kpis"></div>
+    <div class="chart-grid">
+      <div class="card"><div class="card-head"><h4>Retention <em>D1 · D3 · D7</em></h4><div class="card-meta" id="ret-meta">—</div></div>
+        <div class="card-body"><div class="chart-wrap"><canvas id="ch-ret"></canvas></div></div>
+        <div class="caption">Grouped bars per day — each day's groups sit side by side for direct comparison.</div></div>
+      <div class="card"><div class="card-head"><h4>Uplift vs Default <em>% difference</em></h4><div class="card-meta" id="lv-meta">—</div></div>
+        <div class="card-body"><div class="chart-wrap"><canvas id="ch-lv"></canvas></div></div>
+        <div class="caption">Each test group's % difference from Default across retention &amp; Level 10. Line above zero = better than control.</div></div>
+    </div>
+  </section>
+
+  <!-- STATISTICAL RESULTS SECTION -->
+  <section class="section progression">
+    <div class="section-head">
+      <div><div class="num">§ 03 — Statistical Results</div><h2><em>Significance</em></h2></div>
+      <div class="meta" id="stat-meta">Two-tailed Welch's t-test · α = 0.05</div>
+    </div>
+    <div id="stat-mount"></div>
+  </section>
+
+  <!-- CANNIBALIZATION SECTION -->
+  <section class="section economy">
+    <div class="section-head">
+      <div><div class="num">§ 04 — Cannibalization</div><h2>IAP placement <em>breakdown</em></h2></div>
+      <div class="meta">Per-placement purchase events,<br>buyers, conversion &amp; revenue.</div>
+    </div>
+    <div id="cann-mount"></div>
+  </section>
+
+  <div class="colophon">
+    <span>Meridian Analytics · <strong>Nimbus</strong> · A/B Test Reports</span>
+    <span id="colophon-test">—</span>
+  </div>
+</div>
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+var DATA = {"country":{"EM":[{"test":"EM","country":"Brazil","os":"android","group":"default","tu":20421,"iap_conv":0.0014,"iap_rev":122.99,"ad_rev":641.52,"total_rev":764.51,"iap_rpu":0.006,"ad_rpu":0.0314,"total_rpu":0.0374,"d1":28.54,"d3":11.78,"d7":4.96,"lv10":8.26,"ltv7":0.0383,"ltv7_users":8923},{"test":"EM","country":"Brazil","os":"android","group":"test_ems_cashier_trial","tu":20420,"iap_conv":0.0018,"iap_rev":232.25,"ad_rev":644.77,"total_rev":877.03,"iap_rpu":0.0114,"ad_rpu":0.0316,"total_rpu":0.0429,"d1":27.7,"d3":11.9,"d7":5.7,"lv10":8.69,"ltv7":0.0575,"ltv7_users":8825},{"test":"EM","country":"India","os":"android","group":"test_ems_cashier_trial","tu":65328,"iap_conv":0.0003,"iap_rev":61.64,"ad_rev":554.92,"total_rev":616.57,"iap_rpu":0.0009,"ad_rpu":0.0085,"total_rpu":0.0094,"d1":31.97,"d3":13.83,"d7":5.49,"lv10":15.89,"ltv7":0.0102,"ltv7_users":30734},{"test":"EM","country":"India","os":"android","group":"default","tu":64767,"iap_conv":0.0005,"iap_rev":126.58,"ad_rev":533.2,"total_rev":659.79,"iap_rpu":0.002,"ad_rpu":0.0082,"total_rpu":0.0102,"d1":31.57,"d3":13.63,"d7":5.22,"lv10":14.67,"ltv7":0.0123,"ltv7_users":30502},{"test":"EM","country":"Indonesia","os":"android","group":"test_ems_cashier_trial","tu":26456,"iap_conv":0.0008,"iap_rev":77.06,"ad_rev":505.55,"total_rev":582.62,"iap_rpu":0.0029,"ad_rpu":0.0191,"total_rpu":0.022,"d1":36.95,"d3":16.19,"d7":6.76,"lv10":18.71,"ltv7":0.0271,"ltv7_users":11072},{"test":"EM","country":"Indonesia","os":"android","group":"default","tu":26281,"iap_conv":0.0011,"iap_rev":122.69,"ad_rev":505.2,"total_rev":627.89,"iap_rpu":0.0047,"ad_rpu":0.0192,"total_rpu":0.0239,"d1":37.47,"d3":16.47,"d7":6.85,"lv10":18.94,"ltv7":0.0287,"ltv7_users":10946},{"test":"EM","country":"Iraq","os":"android","group":"default","tu":28398,"iap_conv":0.0002,"iap_rev":21.91,"ad_rev":273.57,"total_rev":295.48,"iap_rpu":0.0008,"ad_rpu":0.0096,"total_rpu":0.0104,"d1":35.41,"d3":16.09,"d7":6.38,"lv10":10.68,"ltv7":0.0115,"ltv7_users":13430},{"test":"EM","country":"Iraq","os":"android","group":"test_ems_cashier_trial","tu":28315,"iap_conv":0.0001,"iap_rev":16.95,"ad_rev":252.43,"total_rev":269.38,"iap_rpu":0.0006,"ad_rpu":0.0089,"total_rpu":0.0095,"d1":35.59,"d3":16.52,"d7":5.97,"lv10":11.54,"ltv7":0.0105,"ltv7_users":13425},{"test":"EM","country":"United States of America","os":"android","group":"test_ems_cashier_trial","tu":3899,"iap_conv":0.0159,"iap_rev":895.1,"ad_rev":1088.03,"total_rev":1983.13,"iap_rpu":0.2296,"ad_rpu":0.2791,"total_rpu":0.5086,"d1":28.45,"d3":13.08,"d7":6.08,"lv10":10.54,"ltv7":0.527,"ltv7_users":1761},{"test":"EM","country":"United States of America","os":"android","group":"default","tu":3814,"iap_conv":0.0123,"iap_rev":622.76,"ad_rev":1107.72,"total_rev":1730.48,"iap_rpu":0.1633,"ad_rpu":0.2904,"total_rpu":0.4537,"d1":28.86,"d3":11.1,"d7":4.52,"lv10":10.09,"ltv7":0.5182,"ltv7_users":1754}],"HP":[{"test":"HP","country":"Brazil","os":"android","group":"test_hot_products_bonus_activated","tu":21476,"iap_conv":0.002,"iap_rev":117.09,"ad_rev":717.85,"total_rev":834.94,"iap_rpu":0.0055,"ad_rpu":0.0334,"total_rpu":0.0389,"d1":28.63,"d3":12.19,"d7":5.41,"lv10":8.21,"ltv7":0.043,"ltv7_users":9993},{"test":"HP","country":"Brazil","os":"android","group":"default","tu":21251,"iap_conv":0.0018,"iap_rev":152.61,"ad_rev":677.06,"total_rev":829.67,"iap_rpu":0.0072,"ad_rpu":0.0319,"total_rpu":0.039,"d1":28.41,"d3":12.04,"d7":5.24,"lv10":8.44,"ltv7":0.0402,"ltv7_users":9790},{"test":"HP","country":"India","os":"android","group":"test_hot_products_bonus_activated","tu":66830,"iap_conv":0.0003,"iap_rev":256.27,"ad_rev":573.99,"total_rev":830.26,"iap_rpu":0.0038,"ad_rpu":0.0086,"total_rpu":0.0124,"d1":31.76,"d3":13.81,"d7":5.4,"lv10":14.58,"ltv7":0.0138,"ltv7_users":32284},{"test":"HP","country":"India","os":"android","group":"default","tu":66649,"iap_conv":0.0003,"iap_rev":175.49,"ad_rev":548.03,"total_rev":723.52,"iap_rpu":0.0026,"ad_rpu":0.0082,"total_rpu":0.0109,"d1":31.96,"d3":13.67,"d7":5.36,"lv10":14.99,"ltv7":0.0122,"ltv7_users":32396},{"test":"HP","country":"Indonesia","os":"android","group":"test_hot_products_bonus_activated","tu":27017,"iap_conv":0.0012,"iap_rev":137.84,"ad_rev":548.75,"total_rev":686.59,"iap_rpu":0.0051,"ad_rpu":0.0203,"total_rpu":0.0254,"d1":38.47,"d3":17.02,"d7":6.64,"lv10":19.01,"ltv7":0.0292,"ltv7_users":11763},{"test":"HP","country":"Indonesia","os":"android","group":"default","tu":26955,"iap_conv":0.0011,"iap_rev":189.85,"ad_rev":523.39,"total_rev":713.24,"iap_rpu":0.007,"ad_rpu":0.0194,"total_rpu":0.0265,"d1":36.98,"d3":16.33,"d7":6.55,"lv10":19.07,"ltv7":0.0323,"ltv7_users":11787},{"test":"HP","country":"Iraq","os":"android","group":"default","tu":29402,"iap_conv":0.0002,"iap_rev":13.97,"ad_rev":254.23,"total_rev":268.2,"iap_rpu":0.0005,"ad_rpu":0.0086,"total_rpu":0.0091,"d1":35.52,"d3":16.15,"d7":6.17,"lv10":10.88,"ltv7":0.0097,"ltv7_users":14533},{"test":"HP","country":"Iraq","os":"android","group":"test_hot_products_bonus_activated","tu":29326,"iap_conv":0.0002,"iap_rev":18.89,"ad_rev":291.89,"total_rev":310.79,"iap_rpu":0.0006,"ad_rpu":0.01,"total_rpu":0.0106,"d1":36.13,"d3":16.73,"d7":6.47,"lv10":10.93,"ltv7":0.0122,"ltv7_users":14460},{"test":"HP","country":"United States of America","os":"android","group":"default","tu":4215,"iap_conv":0.0157,"iap_rev":1059.96,"ad_rev":1291.16,"total_rev":2351.12,"iap_rpu":0.2515,"ad_rpu":0.3063,"total_rpu":0.5578,"d1":29.04,"d3":12.22,"d7":6.01,"lv10":9.85,"ltv7":0.6995,"ltv7_users":2093},{"test":"HP","country":"United States of America","os":"android","group":"test_hot_products_bonus_activated","tu":4005,"iap_conv":0.0152,"iap_rev":972.22,"ad_rev":1201.5,"total_rev":2173.72,"iap_rpu":0.2428,"ad_rpu":0.3,"total_rpu":0.5428,"d1":28.59,"d3":12.38,"d7":5.46,"lv10":9.34,"ltv7":0.6123,"ltv7_users":1891}],"IA":[{"test":"IA","country":"India","os":"android","group":"test_intrusive_seg_engaged_free","tu":72114,"iap_conv":0.0004,"iap_rev":159.03,"ad_rev":771.54,"total_rev":930.57,"iap_rpu":0.0022,"ad_rpu":0.0107,"total_rpu":0.0129,"d1":32.1,"d3":15.8,"d7":7.99,"lv10":24.44,"ltv7":0.0142,"ltv7_users":47161},{"test":"IA","country":"India","os":"android","group":"default","tu":71892,"iap_conv":0.0005,"iap_rev":247.04,"ad_rev":774.5,"total_rev":1021.54,"iap_rpu":0.0034,"ad_rpu":0.0108,"total_rpu":0.0142,"d1":32.47,"d3":15.89,"d7":8.02,"lv10":24.67,"ltv7":0.0154,"ltv7_users":47205},{"test":"IA","country":"India","os":"android","group":"test_intrusive_seg_purchaser","tu":71794,"iap_conv":0.0004,"iap_rev":174.07,"ad_rev":773.06,"total_rev":947.14,"iap_rpu":0.0024,"ad_rpu":0.0108,"total_rpu":0.0132,"d1":32.4,"d3":15.87,"d7":7.93,"lv10":24.48,"ltv7":0.0137,"ltv7_users":47228},{"test":"IA","country":"Indonesia","os":"android","group":"test_intrusive_seg_engaged_free","tu":32958,"iap_conv":0.0019,"iap_rev":183.49,"ad_rev":727.98,"total_rev":911.47,"iap_rpu":0.0056,"ad_rpu":0.0221,"total_rpu":0.0277,"d1":35.94,"d3":18.54,"d7":10.01,"lv10":35.41,"ltv7":0.0289,"ltv7_users":20198},{"test":"IA","country":"Indonesia","os":"android","group":"default","tu":32771,"iap_conv":0.002,"iap_rev":270.24,"ad_rev":784.67,"total_rev":1054.9,"iap_rpu":0.0082,"ad_rpu":0.0239,"total_rpu":0.0322,"d1":36.26,"d3":18.93,"d7":10.55,"lv10":35.74,"ltv7":0.0351,"ltv7_users":20235},{"test":"IA","country":"Indonesia","os":"android","group":"test_intrusive_seg_purchaser","tu":32542,"iap_conv":0.0016,"iap_rev":201.5,"ad_rev":752.37,"total_rev":953.87,"iap_rpu":0.0062,"ad_rpu":0.0231,"total_rpu":0.0293,"d1":35.28,"d3":18.64,"d7":10.7,"lv10":35.78,"ltv7":0.0293,"ltv7_users":20010},{"test":"IA","country":"Iraq","os":"android","group":"default","tu":33810,"iap_conv":0.0004,"iap_rev":51.92,"ad_rev":413.41,"total_rev":465.32,"iap_rpu":0.0015,"ad_rpu":0.0122,"total_rpu":0.0138,"d1":34.09,"d3":17.88,"d7":9.16,"lv10":19.47,"ltv7":0.0124,"ltv7_users":22501},{"test":"IA","country":"Iraq","os":"android","group":"test_intrusive_seg_engaged_free","tu":33678,"iap_conv":0.0003,"iap_rev":72.83,"ad_rev":334.0,"total_rev":406.84,"iap_rpu":0.0022,"ad_rpu":0.0099,"total_rpu":0.0121,"d1":34.33,"d3":17.8,"d7":9.03,"lv10":19.94,"ltv7":0.0132,"ltv7_users":22433},{"test":"IA","country":"Iraq","os":"android","group":"test_intrusive_seg_purchaser","tu":33564,"iap_conv":0.0002,"iap_rev":19.93,"ad_rev":347.0,"total_rev":366.92,"iap_rpu":0.0006,"ad_rpu":0.0103,"total_rpu":0.0109,"d1":34.36,"d3":17.29,"d7":8.7,"lv10":19.76,"ltv7":0.0112,"ltv7_users":22080},{"test":"IA","country":"Russia","os":"android","group":"test_intrusive_seg_purchaser","tu":25574,"iap_conv":0.0,"iap_rev":4.99,"ad_rev":1065.07,"total_rev":1070.06,"iap_rpu":0.0002,"ad_rpu":0.0416,"total_rpu":0.0418,"d1":34.24,"d3":14.99,"d7":6.66,"lv10":27.97,"ltv7":0.0401,"ltv7_users":19224},{"test":"IA","country":"Russia","os":"android","group":"default","tu":25520,"iap_conv":0.0,"iap_rev":0.0,"ad_rev":1154.44,"total_rev":1154.44,"iap_rpu":0.0,"ad_rpu":0.0452,"total_rpu":0.0452,"d1":34.32,"d3":15.03,"d7":7.1,"lv10":27.67,"ltv7":0.044,"ltv7_users":19222},{"test":"IA","country":"Russia","os":"android","group":"test_intrusive_seg_engaged_free","tu":25288,"iap_conv":0.0,"iap_rev":0.0,"ad_rev":1048.64,"total_rev":1048.64,"iap_rpu":0.0,"ad_rpu":0.0415,"total_rpu":0.0415,"d1":34.13,"d3":15.3,"d7":6.8,"lv10":27.41,"ltv7":0.0403,"ltv7_users":18874},{"test":"IA","country":"United States of America","os":"android","group":"test_intrusive_seg_purchaser","tu":5199,"iap_conv":0.0246,"iap_rev":2368.97,"ad_rev":2249.67,"total_rev":4618.64,"iap_rpu":0.4557,"ad_rpu":0.4327,"total_rpu":0.8884,"d1":30.11,"d3":16.36,"d7":10.38,"lv10":24.06,"ltv7":0.9034,"ltv7_users":3487},{"test":"IA","country":"United States of America","os":"android","group":"default","tu":5111,"iap_conv":0.0247,"iap_rev":1742.19,"ad_rev":1939.94,"total_rev":3682.13,"iap_rpu":0.3409,"ad_rpu":0.3796,"total_rpu":0.7204,"d1":29.28,"d3":16.06,"d7":10.44,"lv10":22.07,"ltv7":0.7036,"ltv7_users":3409},{"test":"IA","country":"United States of America","os":"android","group":"test_intrusive_seg_engaged_free","tu":5082,"iap_conv":0.0224,"iap_rev":1767.92,"ad_rev":2000.45,"total_rev":3768.37,"iap_rpu":0.3479,"ad_rpu":0.3936,"total_rpu":0.7415,"d1":29.97,"d3":14.81,"d7":9.53,"lv10":23.12,"ltv7":0.8123,"ltv7_users":3387},{"test":"IA","country":"Iraq","os":"ios","group":"test_intrusive_seg_purchaser","tu":3512,"iap_conv":0.002,"iap_rev":30.9,"ad_rev":133.38,"total_rev":164.28,"iap_rpu":0.0088,"ad_rpu":0.038,"total_rpu":0.0468,"d1":40.4,"d3":22.81,"d7":13.55,"lv10":31.63,"ltv7":0.0391,"ltv7_users":2401},{"test":"IA","country":"Iraq","os":"ios","group":"test_intrusive_seg_engaged_free","tu":3432,"iap_conv":0.0023,"iap_rev":85.88,"ad_rev":137.15,"total_rev":223.03,"iap_rpu":0.025,"ad_rpu":0.04,"total_rpu":0.065,"d1":41.47,"d3":25.12,"d7":14.39,"lv10":31.93,"ltv7":0.0709,"ltv7_users":2337},{"test":"IA","country":"Iraq","os":"ios","group":"default","tu":3300,"iap_conv":0.0021,"iap_rev":84.86,"ad_rev":125.74,"total_rev":210.6,"iap_rpu":0.0257,"ad_rpu":0.0381,"total_rpu":0.0638,"d1":41.52,"d3":22.85,"d7":14.49,"lv10":32.88,"ltv7":0.0754,"ltv7_users":2214},{"test":"IA","country":"Russia","os":"ios","group":"test_intrusive_seg_purchaser","tu":4464,"iap_conv":0.0016,"iap_rev":47.34,"ad_rev":904.76,"total_rev":952.1,"iap_rpu":0.0106,"ad_rpu":0.2027,"total_rpu":0.2133,"d1":41.04,"d3":22.09,"d7":12.29,"lv10":46.37,"ltv7":0.199,"ltv7_users":3398},{"test":"IA","country":"Russia","os":"ios","group":"default","tu":4355,"iap_conv":0.0011,"iap_rev":38.61,"ad_rev":889.37,"total_rev":927.97,"iap_rpu":0.0089,"ad_rpu":0.2042,"total_rpu":0.2131,"d1":41.35,"d3":22.82,"d7":12.12,"lv10":46.22,"ltv7":0.1935,"ltv7_users":3379},{"test":"IA","country":"Russia","os":"ios","group":"test_intrusive_seg_engaged_free","tu":4311,"iap_conv":0.0014,"iap_rev":20.88,"ad_rev":818.18,"total_rev":839.06,"iap_rpu":0.0048,"ad_rpu":0.1898,"total_rpu":0.1946,"d1":40.51,"d3":21.71,"d7":12.31,"lv10":45.67,"ltv7":0.1814,"ltv7_users":3299},{"test":"IA","country":"Saudi Arabia","os":"ios","group":"test_intrusive_seg_purchaser","tu":4582,"iap_conv":0.005,"iap_rev":153.48,"ad_rev":525.3,"total_rev":678.78,"iap_rpu":0.0335,"ad_rpu":0.1146,"total_rpu":0.1481,"d1":32.39,"d3":14.75,"d7":8.34,"lv10":18.38,"ltv7":0.1358,"ltv7_users":2945},{"test":"IA","country":"Saudi Arabia","os":"ios","group":"default","tu":4539,"iap_conv":0.0071,"iap_rev":316.01,"ad_rev":575.35,"total_rev":891.36,"iap_rpu":0.0696,"ad_rpu":0.1268,"total_rpu":0.1964,"d1":33.18,"d3":16.68,"d7":9.0,"lv10":19.3,"ltv7":0.1749,"ltv7_users":2890},{"test":"IA","country":"Saudi Arabia","os":"ios","group":"test_intrusive_seg_engaged_free","tu":4434,"iap_conv":0.0043,"iap_rev":171.35,"ad_rev":578.71,"total_rev":750.06,"iap_rpu":0.0386,"ad_rpu":0.1305,"total_rpu":0.1692,"d1":32.81,"d3":15.8,"d7":8.32,"lv10":20.52,"ltv7":0.1603,"ltv7_users":2881},{"test":"IA","country":"T\u00fcrkiye","os":"ios","group":"test_intrusive_seg_engaged_free","tu":3805,"iap_conv":0.0173,"iap_rev":639.46,"ad_rev":458.19,"total_rev":1097.64,"iap_rpu":0.1681,"ad_rpu":0.1204,"total_rpu":0.2885,"d1":38.71,"d3":23.95,"d7":14.2,"lv10":35.95,"ltv7":0.3406,"ltv7_users":2450},{"test":"IA","country":"T\u00fcrkiye","os":"ios","group":"test_intrusive_seg_purchaser","tu":3758,"iap_conv":0.0173,"iap_rev":590.43,"ad_rev":452.95,"total_rev":1043.38,"iap_rpu":0.1571,"ad_rpu":0.1205,"total_rpu":0.2776,"d1":40.12,"d3":22.43,"d7":13.52,"lv10":35.5,"ltv7":0.298,"ltv7_users":2445},{"test":"IA","country":"T\u00fcrkiye","os":"ios","group":"default","tu":3750,"iap_conv":0.0152,"iap_rev":406.91,"ad_rev":432.81,"total_rev":839.73,"iap_rpu":0.1085,"ad_rpu":0.1154,"total_rpu":0.2239,"d1":37.83,"d3":22.23,"d7":13.89,"lv10":35.76,"ltv7":0.2226,"ltv7_users":2467},{"test":"IA","country":"United States of America","os":"ios","group":"test_intrusive_seg_purchaser","tu":13020,"iap_conv":0.0571,"iap_rev":11212.78,"ad_rev":8236.91,"total_rev":19449.69,"iap_rpu":0.8612,"ad_rpu":0.6326,"total_rpu":1.4938,"d1":34.56,"d3":20.88,"d7":15.44,"lv10":35.83,"ltv7":1.4446,"ltv7_users":8890},{"test":"IA","country":"United States of America","os":"ios","group":"default","tu":12997,"iap_conv":0.0526,"iap_rev":10331.21,"ad_rev":7764.09,"total_rev":18095.3,"iap_rpu":0.7949,"ad_rpu":0.5974,"total_rpu":1.3923,"d1":33.67,"d3":20.45,"d7":14.69,"lv10":35.35,"ltv7":1.374,"ltv7_users":8885},{"test":"IA","country":"United States of America","os":"ios","group":"test_intrusive_seg_engaged_free","tu":12973,"iap_conv":0.0526,"iap_rev":8999.02,"ad_rev":8282.24,"total_rev":17281.26,"iap_rpu":0.6937,"ad_rpu":0.6384,"total_rpu":1.3321,"d1":33.97,"d3":20.98,"d7":15.05,"lv10":35.66,"ltv7":1.3633,"ltv7_users":8806}]},"cann":{"EM":[{"test":"EM","name":"Manager's Season Pass (Pro + Elite)","group":"default","events":31,"buyers":31,"conv":0.00896,"rev":509.91},{"test":"EM","name":"Starter Pack","group":"default","events":87,"buyers":87,"conv":0.02516,"rev":499.87},{"test":"EM","name":"Remove Ads","group":"default","events":88,"buyers":88,"conv":0.02544,"rev":497.6},{"test":"EM","name":"500 Energy Bundle","group":"default","events":77,"buyers":61,"conv":0.01764,"rev":343.58},{"test":"EM","name":"100 Energy Bundle","group":"default","events":232,"buyers":160,"conv":0.04626,"rev":253.44},{"test":"EM","name":"Manager's Season Pass (Elite)","group":"default","events":16,"buyers":16,"conv":0.00463,"rev":213.58},{"test":"EM","name":"Manager's Season Pass (Pro)","group":"default","events":36,"buyers":36,"conv":0.01041,"rev":195.83},{"test":"EM","name":"1000 Energy Bundle V2","group":"default","events":20,"buyers":18,"conv":0.0052,"rev":178.83},{"test":"EM","name":"$2750 Cash Bundle","group":"default","events":11,"buyers":9,"conv":0.0026,"rev":159.43},{"test":"EM","name":"$1100 Cash Bundle","group":"default","events":18,"buyers":11,"conv":0.00318,"rev":152.06},{"test":"EM","name":"Premium Racks","group":"default","events":25,"buyers":11,"conv":0.00318,"rev":138.72},{"test":"EM","name":"2250 Energy Bundle","group":"default","events":7,"buyers":7,"conv":0.00202,"rev":120.19},{"test":"EM","name":"VIP Rush Event","group":"default","events":15,"buyers":15,"conv":0.00434,"rev":112.2},{"test":"EM","name":"Energy Rolling Offer Step 2","group":"default","events":96,"buyers":84,"conv":0.02429,"rev":106.41},{"test":"EM","name":"$500 Cash Bundle V2","group":"default","events":21,"buyers":15,"conv":0.00434,"rev":93.43},{"test":"EM","name":"Cash Rolling Offer Step 6","group":"default","events":27,"buyers":24,"conv":0.00694,"rev":87.75},{"test":"EM","name":"$20000 Cash Bundle","group":"default","events":1,"buyers":1,"conv":0.00029,"rev":74.59},{"test":"EM","name":"Cash Rolling Offer Step 10","group":"default","events":10,"buyers":9,"conv":0.0026,"rev":54.1},{"test":"EM","name":"5000 Energy Bundle","group":"default","events":1,"buyers":1,"conv":0.00029,"rev":40.59},{"test":"EM","name":"$8000 Cash Bundle","group":"default","events":1,"buyers":1,"conv":0.00029,"rev":36.98},{"test":"EM","name":"Winter Season Pass","group":"default","events":4,"buyers":4,"conv":0.00116,"rev":26.51},{"test":"EM","name":"$100 Cash Bundle","group":"default","events":25,"buyers":22,"conv":0.00636,"rev":26.31},{"test":"EM","name":"Energy Rolling Offer Step 14","group":"default","events":2,"buyers":2,"conv":0.00058,"rev":20.8},{"test":"EM","name":"Cash Rolling Offer Step 18","group":"default","events":1,"buyers":1,"conv":0.00029,"rev":20.22},{"test":"EM","name":"VIP Rush Event Discounted","group":"default","events":3,"buyers":3,"conv":0.00087,"rev":16.2},{"test":"EM","name":"Summer Pass 2026","group":"default","events":1,"buyers":1,"conv":0.00029,"rev":7.54},{"test":"EM","name":"Season Bundle Canada Independence","group":"default","events":1,"buyers":1,"conv":0.00029,"rev":5.03},{"test":"EM","name":"Season Bundle USA Independence","group":"default","events":1,"buyers":1,"conv":0.00029,"rev":5.03},{"test":"EM","name":"Remove Ads","group":"test_ems_cashier_trial","events":94,"buyers":94,"conv":0.02711,"rev":545.79},{"test":"EM","name":"Manager's Season Pass (Pro + Elite)","group":"test_ems_cashier_trial","events":30,"buyers":30,"conv":0.00865,"rev":490.46},{"test":"EM","name":"Starter Pack","group":"test_ems_cashier_trial","events":84,"buyers":84,"conv":0.02423,"rev":468.25},{"test":"EM","name":"Manager's Season Pass (Pro)","group":"test_ems_cashier_trial","events":51,"buyers":51,"conv":0.01471,"rev":272.82},{"test":"EM","name":"500 Energy Bundle","group":"test_ems_cashier_trial","events":52,"buyers":38,"conv":0.01096,"rev":240.75},{"test":"EM","name":"Premium Racks","group":"test_ems_cashier_trial","events":43,"buyers":17,"conv":0.0049,"rev":240.0},{"test":"EM","name":"100 Energy Bundle","group":"test_ems_cashier_trial","events":201,"buyers":132,"conv":0.03808,"rev":215.52},{"test":"EM","name":"$500 Cash Bundle V2","group":"test_ems_cashier_trial","events":32,"buyers":22,"conv":0.00635,"rev":138.66},{"test":"EM","name":"Manager's Season Pass (Elite)","group":"test_ems_cashier_trial","events":10,"buyers":10,"conv":0.00288,"rev":134.93},{"test":"EM","name":"$1100 Cash Bundle","group":"test_ems_cashier_trial","events":15,"buyers":13,"conv":0.00375,"rev":123.73},{"test":"EM","name":"VIP Rush Event","group":"test_ems_cashier_trial","events":15,"buyers":14,"conv":0.00404,"rev":115.35},{"test":"EM","name":"1000 Energy Bundle V2","group":"test_ems_cashier_trial","events":13,"buyers":13,"conv":0.00375,"rev":111.07},{"test":"EM","name":"$2750 Cash Bundle","group":"test_ems_cashier_trial","events":7,"buyers":7,"conv":0.00202,"rev":100.55},{"test":"EM","name":"Energy Rolling Offer Step 2","group":"test_ems_cashier_trial","events":86,"buyers":75,"conv":0.02163,"rev":91.51},{"test":"EM","name":"$8000 Cash Bundle","group":"test_ems_cashier_trial","events":3,"buyers":3,"conv":0.00087,"rev":88.07},{"test":"EM","name":"Cash Rolling Offer Step 6","group":"test_ems_cashier_trial","events":27,"buyers":25,"conv":0.00721,"rev":86.75},{"test":"EM","name":"$20000 Cash Bundle","group":"test_ems_cashier_trial","events":1,"buyers":1,"conv":0.00029,"rev":59.99},{"test":"EM","name":"$100 Cash Bundle","group":"test_ems_cashier_trial","events":55,"buyers":23,"conv":0.00663,"rev":59.79},{"test":"EM","name":"2250 Energy Bundle","group":"test_ems_cashier_trial","events":2,"buyers":1,"conv":0.00029,"rev":37.41},{"test":"EM","name":"Cash Rolling Offer Step 10","group":"test_ems_cashier_trial","events":6,"buyers":6,"conv":0.00173,"rev":31.79},{"test":"EM","name":"5000 Energy Bundle","group":"test_ems_cashier_trial","events":1,"buyers":1,"conv":0.00029,"rev":29.08},{"test":"EM","name":"VIP Rush Event Discounted","group":"test_ems_cashier_trial","events":5,"buyers":5,"conv":0.00144,"rev":27.03},{"test":"EM","name":"Summer Pass 2026","group":"test_ems_cashier_trial","events":4,"buyers":4,"conv":0.00115,"rev":26.95},{"test":"EM","name":"Winter Season Pass","group":"test_ems_cashier_trial","events":3,"buyers":3,"conv":0.00087,"rev":19.84},{"test":"EM","name":"Energy Rolling Offer Step 14","group":"test_ems_cashier_trial","events":1,"buyers":1,"conv":0.00029,"rev":9.99}],"HP":[{"test":"HP","name":"Manager's Season Pass (Pro + Elite)","group":"default","events":38,"buyers":38,"conv":0.01,"rev":622.42},{"test":"HP","name":"Starter Pack","group":"default","events":104,"buyers":104,"conv":0.03,"rev":575.25},{"test":"HP","name":"Remove Ads","group":"default","events":101,"buyers":101,"conv":0.03,"rev":573.65},{"test":"HP","name":"Premium Racks","group":"default","events":60,"buyers":23,"conv":0.01,"rev":331.43},{"test":"HP","name":"$2750 Cash Bundle","group":"default","events":22,"buyers":17,"conv":0.0,"rev":318.2},{"test":"HP","name":"500 Energy Bundle","group":"default","events":70,"buyers":48,"conv":0.01,"rev":306.64},{"test":"HP","name":"100 Energy Bundle","group":"default","events":219,"buyers":146,"conv":0.04,"rev":244.92},{"test":"HP","name":"Manager's Season Pass (Pro)","group":"default","events":44,"buyers":44,"conv":0.01,"rev":243.8},{"test":"HP","name":"Manager's Season Pass (Elite)","group":"default","events":14,"buyers":13,"conv":0.0,"rev":183.19},{"test":"HP","name":"VIP Rush Event","group":"default","events":22,"buyers":19,"conv":0.01,"rev":167.35},{"test":"HP","name":"1000 Energy Bundle V2","group":"default","events":14,"buyers":14,"conv":0.0,"rev":132.7},{"test":"HP","name":"$500 Cash Bundle V2","group":"default","events":25,"buyers":21,"conv":0.01,"rev":109.19},{"test":"HP","name":"Energy Rolling Offer Step 2","group":"default","events":93,"buyers":81,"conv":0.02,"rev":99.01},{"test":"HP","name":"$8000 Cash Bundle","group":"default","events":3,"buyers":3,"conv":0.0,"rev":93.36},{"test":"HP","name":"$1100 Cash Bundle","group":"default","events":10,"buyers":9,"conv":0.0,"rev":87.0},{"test":"HP","name":"Cash Rolling Offer Step 6","group":"default","events":25,"buyers":22,"conv":0.01,"rev":81.36},{"test":"HP","name":"2250 Energy Bundle","group":"default","events":4,"buyers":4,"conv":0.0,"rev":70.07},{"test":"HP","name":"$20000 Cash Bundle","group":"default","events":1,"buyers":1,"conv":0.0,"rev":55.7},{"test":"HP","name":"Energy Rolling Offer Step 26","group":"default","events":1,"buyers":1,"conv":0.0,"rev":49.99},{"test":"HP","name":"Cash Rolling Offer Step 10","group":"default","events":9,"buyers":8,"conv":0.0,"rev":49.96},{"test":"HP","name":"Cash Rolling Offer Step 18","group":"default","events":2,"buyers":2,"conv":0.0,"rev":41.37},{"test":"HP","name":"Cash Rolling Offer Step 22","group":"default","events":1,"buyers":1,"conv":0.0,"rev":34.99},{"test":"HP","name":"Winter Season Pass","group":"default","events":5,"buyers":5,"conv":0.0,"rev":33.01},{"test":"HP","name":"VIP Rush Event Discounted","group":"default","events":6,"buyers":6,"conv":0.0,"rev":31.72},{"test":"HP","name":"$100 Cash Bundle","group":"default","events":30,"buyers":23,"conv":0.01,"rev":31.43},{"test":"HP","name":"Energy Rolling Offer Step 14","group":"default","events":3,"buyers":3,"conv":0.0,"rev":30.67},{"test":"HP","name":"Summer Pass 2026","group":"default","events":2,"buyers":2,"conv":0.0,"rev":14.49},{"test":"HP","name":"Remove Ads","group":"test_hot_products_bonus_activated","events":103,"buyers":103,"conv":0.03,"rev":575.85},{"test":"HP","name":"Manager's Season Pass (Pro + Elite)","group":"test_hot_products_bonus_activated","events":30,"buyers":30,"conv":0.01,"rev":491.03},{"test":"HP","name":"Starter Pack","group":"test_hot_products_bonus_activated","events":70,"buyers":70,"conv":0.02,"rev":405.85},{"test":"HP","name":"100 Energy Bundle","group":"test_hot_products_bonus_activated","events":312,"buyers":197,"conv":0.06,"rev":337.21},{"test":"HP","name":"500 Energy Bundle","group":"test_hot_products_bonus_activated","events":71,"buyers":53,"conv":0.01,"rev":301.64},{"test":"HP","name":"1000 Energy Bundle V2","group":"test_hot_products_bonus_activated","events":27,"buyers":17,"conv":0.0,"rev":228.3},{"test":"HP","name":"Manager's Season Pass (Pro)","group":"test_hot_products_bonus_activated","events":41,"buyers":41,"conv":0.01,"rev":220.96},{"test":"HP","name":"Manager's Season Pass (Elite)","group":"test_hot_products_bonus_activated","events":13,"buyers":13,"conv":0.0,"rev":170.46},{"test":"HP","name":"$2750 Cash Bundle","group":"test_hot_products_bonus_activated","events":11,"buyers":7,"conv":0.0,"rev":147.64},{"test":"HP","name":"Premium Racks","group":"test_hot_products_bonus_activated","events":26,"buyers":15,"conv":0.0,"rev":143.64},{"test":"HP","name":"$1100 Cash Bundle","group":"test_hot_products_bonus_activated","events":17,"buyers":10,"conv":0.0,"rev":142.16},{"test":"HP","name":"$500 Cash Bundle V2","group":"test_hot_products_bonus_activated","events":27,"buyers":22,"conv":0.01,"rev":115.8},{"test":"HP","name":"2250 Energy Bundle","group":"test_hot_products_bonus_activated","events":7,"buyers":6,"conv":0.0,"rev":109.44},{"test":"HP","name":"Energy Rolling Offer Step 2","group":"test_hot_products_bonus_activated","events":91,"buyers":76,"conv":0.02,"rev":98.27},{"test":"HP","name":"VIP Rush Event","group":"test_hot_products_bonus_activated","events":13,"buyers":13,"conv":0.0,"rev":97.98},{"test":"HP","name":"$8000 Cash Bundle","group":"test_hot_products_bonus_activated","events":3,"buyers":3,"conv":0.0,"rev":91.06},{"test":"HP","name":"Cash Rolling Offer Step 6","group":"test_hot_products_bonus_activated","events":22,"buyers":20,"conv":0.01,"rev":70.63},{"test":"HP","name":"5000 Energy Bundle","group":"test_hot_products_bonus_activated","events":2,"buyers":2,"conv":0.0,"rev":70.58},{"test":"HP","name":"$20000 Cash Bundle","group":"test_hot_products_bonus_activated","events":1,"buyers":1,"conv":0.0,"rev":59.99},{"test":"HP","name":"$100 Cash Bundle","group":"test_hot_products_bonus_activated","events":31,"buyers":26,"conv":0.01,"rev":32.26},{"test":"HP","name":"Cash Rolling Offer Step 10","group":"test_hot_products_bonus_activated","events":6,"buyers":5,"conv":0.0,"rev":31.25},{"test":"HP","name":"VIP Rush Event Discounted","group":"test_hot_products_bonus_activated","events":5,"buyers":5,"conv":0.0,"rev":29.04},{"test":"HP","name":"Cash Rolling Offer Step 18","group":"test_hot_products_bonus_activated","events":1,"buyers":1,"conv":0.0,"rev":20.26},{"test":"HP","name":"Energy Rolling Offer Step 14","group":"test_hot_products_bonus_activated","events":2,"buyers":1,"conv":0.0,"rev":20.2},{"test":"HP","name":"VIP Employee Bundle","group":"test_hot_products_bonus_activated","events":1,"buyers":1,"conv":0.0,"rev":15.1},{"test":"HP","name":"Summer Pass 2026","group":"test_hot_products_bonus_activated","events":2,"buyers":2,"conv":0.0,"rev":13.04},{"test":"HP","name":"Winter Season Pass","group":"test_hot_products_bonus_activated","events":2,"buyers":2,"conv":0.0,"rev":12.64},{"test":"HP","name":"Season Bundle Canada Independence","group":"test_hot_products_bonus_activated","events":1,"buyers":1,"conv":0.0,"rev":5.03},{"test":"HP","name":"Season Bundle USA Independence","group":"test_hot_products_bonus_activated","events":1,"buyers":1,"conv":0.0,"rev":5.03}],"IA":[{"test":"IA","name":"Manager's Season Pass (Pro + Elite)","group":"default","events":45,"buyers":45,"conv":0.0126,"rev":722.8,"os":"android"},{"test":"IA","name":"Remove Ads","group":"default","events":124,"buyers":124,"conv":0.0346,"rev":687.11,"os":"android"},{"test":"IA","name":"Premium Racks","group":"default","events":128,"buyers":67,"conv":0.0187,"rev":682.36,"os":"android"},{"test":"IA","name":"Starter Pack","group":"default","events":81,"buyers":81,"conv":0.0226,"rev":454.72,"os":"android"},{"test":"IA","name":"1000 Energy Bundle V2","group":"default","events":43,"buyers":27,"conv":0.0075,"rev":376.33,"os":"android"},{"test":"IA","name":"100 Energy Bundle","group":"default","events":298,"buyers":205,"conv":0.0572,"rev":323.63,"os":"android"},{"test":"IA","name":"VIP Rush Event","group":"default","events":43,"buyers":39,"conv":0.0109,"rev":319.78,"os":"android"},{"test":"IA","name":"Energy Rolling Offer Step 2","group":"default","events":276,"buyers":217,"conv":0.0606,"rev":299.05,"os":"android"},{"test":"IA","name":"Manager's Season Pass (Pro)","group":"default","events":53,"buyers":53,"conv":0.0148,"rev":278.99,"os":"android"},{"test":"IA","name":"Manager's Season Pass (Elite)","group":"default","events":21,"buyers":21,"conv":0.0059,"rev":275.13,"os":"android"},{"test":"IA","name":"500 Energy Bundle","group":"default","events":61,"buyers":57,"conv":0.0159,"rev":257.86,"os":"android"},{"test":"IA","name":"Cash Rolling Offer Step 6","group":"default","events":78,"buyers":64,"conv":0.0179,"rev":252.74,"os":"android"},{"test":"IA","name":"$2750 Cash Bundle","group":"default","events":16,"buyers":14,"conv":0.0039,"rev":230.2,"os":"android"},{"test":"IA","name":"$20000 Cash Bundle","group":"default","events":3,"buyers":3,"conv":0.0008,"rev":194.23,"os":"android"},{"test":"IA","name":"$1100 Cash Bundle","group":"default","events":20,"buyers":14,"conv":0.0039,"rev":167.09,"os":"android"},{"test":"IA","name":"Cash Rolling Offer Step 10","group":"default","events":26,"buyers":21,"conv":0.0059,"rev":138.23,"os":"android"},{"test":"IA","name":"$500 Cash Bundle V2","group":"default","events":26,"buyers":24,"conv":0.0067,"rev":121.1,"os":"android"},{"test":"IA","name":"VIP Rush Event Discounted","group":"default","events":17,"buyers":17,"conv":0.0047,"rev":88.26,"os":"android"},{"test":"IA","name":"2250 Energy Bundle","group":"default","events":4,"buyers":3,"conv":0.0008,"rev":68.49,"os":"android"},{"test":"IA","name":"Energy Rolling Offer Step 14","group":"default","events":6,"buyers":5,"conv":0.0014,"rev":63.01,"os":"android"},{"test":"IA","name":"Winter Season Pass","group":"default","events":7,"buyers":7,"conv":0.002,"rev":45.5,"os":"android"},{"test":"IA","name":"$100 Cash Bundle","group":"default","events":41,"buyers":34,"conv":0.0095,"rev":44.91,"os":"android"},{"test":"IA","name":"Cash Rolling Offer Step 18","group":"default","events":2,"buyers":2,"conv":0.0006,"rev":44.48,"os":"android"},{"test":"IA","name":"Summer Pass 2026","group":"default","events":3,"buyers":3,"conv":0.0008,"rev":19.84,"os":"android"},{"test":"IA","name":"Manager's Season Pass (Pro + Elite)","group":"test_intrusive_seg_engaged_free","events":50,"buyers":50,"conv":0.0139,"rev":825.65,"os":"android"},{"test":"IA","name":"Remove Ads","group":"test_intrusive_seg_engaged_free","events":95,"buyers":95,"conv":0.0265,"rev":522.53,"os":"android"},{"test":"IA","name":"Premium Racks","group":"test_intrusive_seg_engaged_free","events":87,"buyers":45,"conv":0.0125,"rev":483.98,"os":"android"},{"test":"IA","name":"VIP Rush Event","group":"test_intrusive_seg_engaged_free","events":52,"buyers":48,"conv":0.0134,"rev":395.59,"os":"android"},{"test":"IA","name":"Starter Pack","group":"test_intrusive_seg_engaged_free","events":68,"buyers":68,"conv":0.019,"rev":384.83,"os":"android"},{"test":"IA","name":"100 Energy Bundle","group":"test_intrusive_seg_engaged_free","events":299,"buyers":211,"conv":0.0588,"rev":325.7,"os":"android"},{"test":"IA","name":"Energy Rolling Offer Step 2","group":"test_intrusive_seg_engaged_free","events":282,"buyers":221,"conv":0.0616,"rev":303.68,"os":"android"},{"test":"IA","name":"1000 Energy Bundle V2","group":"test_intrusive_seg_engaged_free","events":33,"buyers":30,"conv":0.0084,"rev":297.29,"os":"android"},{"test":"IA","name":"$2750 Cash Bundle","group":"test_intrusive_seg_engaged_free","events":20,"buyers":15,"conv":0.0042,"rev":285.36,"os":"android"},{"test":"IA","name":"500 Energy Bundle","group":"test_intrusive_seg_engaged_free","events":66,"buyers":51,"conv":0.0142,"rev":278.71,"os":"android"},{"test":"IA","name":"Manager's Season Pass (Pro)","group":"test_intrusive_seg_engaged_free","events":49,"buyers":49,"conv":0.0137,"rev":270.13,"os":"android"},{"test":"IA","name":"Manager's Season Pass (Elite)","group":"test_intrusive_seg_engaged_free","events":18,"buyers":18,"conv":0.005,"rev":242.44,"os":"android"},{"test":"IA","name":"Cash Rolling Offer Step 6","group":"test_intrusive_seg_engaged_free","events":65,"buyers":52,"conv":0.0145,"rev":211.71,"os":"android"},{"test":"IA","name":"$8000 Cash Bundle","group":"test_intrusive_seg_engaged_free","events":7,"buyers":6,"conv":0.0017,"rev":210.6,"os":"android"},{"test":"IA","name":"2250 Energy Bundle","group":"test_intrusive_seg_engaged_free","events":11,"buyers":11,"conv":0.0031,"rev":171.09,"os":"android"},{"test":"IA","name":"$1100 Cash Bundle","group":"test_intrusive_seg_engaged_free","events":17,"buyers":13,"conv":0.0036,"rev":154.88,"os":"android"},{"test":"IA","name":"$20000 Cash Bundle","group":"test_intrusive_seg_engaged_free","events":2,"buyers":2,"conv":0.0006,"rev":135.18,"os":"android"},{"test":"IA","name":"Cash Rolling Offer Step 10","group":"test_intrusive_seg_engaged_free","events":21,"buyers":17,"conv":0.0047,"rev":117.01,"os":"android"},{"test":"IA","name":"$500 Cash Bundle V2","group":"test_intrusive_seg_engaged_free","events":26,"buyers":22,"conv":0.0061,"rev":114.06,"os":"android"},{"test":"IA","name":"VIP Rush Event Discounted","group":"test_intrusive_seg_engaged_free","events":19,"buyers":18,"conv":0.005,"rev":105.73,"os":"android"},{"test":"IA","name":"Winter Season Pass","group":"test_intrusive_seg_engaged_free","events":15,"buyers":15,"conv":0.0042,"rev":99.42,"os":"android"},{"test":"IA","name":"10000 Energy Bundle","group":"test_intrusive_seg_engaged_free","events":1,"buyers":1,"conv":0.0003,"rev":59.99,"os":"android"},{"test":"IA","name":"Cash Rolling Offer Step 18","group":"test_intrusive_seg_engaged_free","events":2,"buyers":2,"conv":0.0006,"rev":43.37,"os":"android"},{"test":"IA","name":"Energy Rolling Offer Step 14","group":"test_intrusive_seg_engaged_free","events":4,"buyers":4,"conv":0.0011,"rev":43.29,"os":"android"},{"test":"IA","name":"$100 Cash Bundle","group":"test_intrusive_seg_engaged_free","events":38,"buyers":26,"conv":0.0072,"rev":41.54,"os":"android"},{"test":"IA","name":"Summer Pass 2026","group":"test_intrusive_seg_engaged_free","events":2,"buyers":2,"conv":0.0006,"rev":12.89,"os":"android"},{"test":"IA","name":"Remove Ads","group":"test_intrusive_seg_purchaser","events":128,"buyers":128,"conv":0.0357,"rev":725.55,"os":"android"},{"test":"IA","name":"Manager's Season Pass (Pro + Elite)","group":"test_intrusive_seg_purchaser","events":37,"buyers":37,"conv":0.0103,"rev":615.3,"os":"android"},{"test":"IA","name":"VIP Rush Event","group":"test_intrusive_seg_purchaser","events":82,"buyers":72,"conv":0.0201,"rev":614.9,"os":"android"},{"test":"IA","name":"Premium Racks","group":"test_intrusive_seg_purchaser","events":97,"buyers":54,"conv":0.0151,"rev":526.17,"os":"android"},{"test":"IA","name":"Starter Pack","group":"test_intrusive_seg_purchaser","events":72,"buyers":71,"conv":0.0198,"rev":407.93,"os":"android"},{"test":"IA","name":"500 Energy Bundle","group":"test_intrusive_seg_purchaser","events":82,"buyers":60,"conv":0.0168,"rev":348.26,"os":"android"},{"test":"IA","name":"Manager's Season Pass (Pro)","group":"test_intrusive_seg_purchaser","events":62,"buyers":62,"conv":0.0173,"rev":337.8,"os":"android"},{"test":"IA","name":"Energy Rolling Offer Step 2","group":"test_intrusive_seg_purchaser","events":305,"buyers":234,"conv":0.0654,"rev":328.17,"os":"android"},{"test":"IA","name":"$2750 Cash Bundle","group":"test_intrusive_seg_purchaser","events":22,"buyers":16,"conv":0.0045,"rev":316.4,"os":"android"},{"test":"IA","name":"100 Energy Bundle","group":"test_intrusive_seg_purchaser","events":285,"buyers":198,"conv":0.0553,"rev":307.48,"os":"android"},{"test":"IA","name":"1000 Energy Bundle V2","group":"test_intrusive_seg_purchaser","events":29,"buyers":21,"conv":0.0059,"rev":249.79,"os":"android"},{"test":"IA","name":"Cash Rolling Offer Step 6","group":"test_intrusive_seg_purchaser","events":74,"buyers":59,"conv":0.0165,"rev":241.86,"os":"android"},{"test":"IA","name":"$8000 Cash Bundle","group":"test_intrusive_seg_purchaser","events":8,"buyers":8,"conv":0.0022,"rev":239.56,"os":"android"},{"test":"IA","name":"$20000 Cash Bundle","group":"test_intrusive_seg_purchaser","events":3,"buyers":3,"conv":0.0008,"rev":182.69,"os":"android"},{"test":"IA","name":"2250 Energy Bundle","group":"test_intrusive_seg_purchaser","events":9,"buyers":9,"conv":0.0025,"rev":145.64,"os":"android"},{"test":"IA","name":"Cash Rolling Offer Step 10","group":"test_intrusive_seg_purchaser","events":26,"buyers":23,"conv":0.0064,"rev":139.86,"os":"android"},{"test":"IA","name":"Manager's Season Pass (Elite)","group":"test_intrusive_seg_purchaser","events":10,"buyers":10,"conv":0.0028,"rev":128.5,"os":"android"},{"test":"IA","name":"Energy Rolling Offer Step 14","group":"test_intrusive_seg_purchaser","events":11,"buyers":10,"conv":0.0028,"rev":119.66,"os":"android"},{"test":"IA","name":"VIP Rush Event Discounted","group":"test_intrusive_seg_purchaser","events":22,"buyers":22,"conv":0.0061,"rev":119.01,"os":"android"},{"test":"IA","name":"Winter Season Pass","group":"test_intrusive_seg_purchaser","events":16,"buyers":16,"conv":0.0045,"rev":110.73,"os":"android"},{"test":"IA","name":"$500 Cash Bundle V2","group":"test_intrusive_seg_purchaser","events":26,"buyers":20,"conv":0.0056,"rev":103.16,"os":"android"},{"test":"IA","name":"$1100 Cash Bundle","group":"test_intrusive_seg_purchaser","events":11,"buyers":9,"conv":0.0025,"rev":83.99,"os":"android"},{"test":"IA","name":"Cash Rolling Offer Step 18","group":"test_intrusive_seg_purchaser","events":3,"buyers":3,"conv":0.0008,"rev":64.91,"os":"android"},{"test":"IA","name":"$100 Cash Bundle","group":"test_intrusive_seg_purchaser","events":58,"buyers":29,"conv":0.0081,"rev":62.04,"os":"android"},{"test":"IA","name":"Energy Rolling Offer Step 26","group":"test_intrusive_seg_purchaser","events":1,"buyers":1,"conv":0.0003,"rev":49.99,"os":"android"},{"test":"IA","name":"Cash Rolling Offer Step 22","group":"test_intrusive_seg_purchaser","events":1,"buyers":1,"conv":0.0003,"rev":34.99,"os":"android"},{"test":"IA","name":"5000 Energy Bundle","group":"test_intrusive_seg_purchaser","events":1,"buyers":1,"conv":0.0003,"rev":29.99,"os":"android"},{"test":"IA","name":"Summer Pass 2026","group":"test_intrusive_seg_purchaser","events":1,"buyers":1,"conv":0.0003,"rev":7.13,"os":"android"},{"test":"IA","name":"Season Bundle Canada Independence","group":"test_intrusive_seg_purchaser","events":1,"buyers":1,"conv":0.0003,"rev":5.03,"os":"android"},{"test":"IA","name":"Remove Ads All","group":"default","events":508,"buyers":476,"conv":0.6517,"rev":2826.21,"os":"ios"},{"test":"IA","name":"manager pass pro + elite","group":"default","events":160,"buyers":154,"conv":0.2108,"rev":2617.46,"os":"ios"},{"test":"IA","name":"Starter Pack","group":"default","events":241,"buyers":230,"conv":0.3149,"rev":1582.39,"os":"ios"},{"test":"IA","name":"Premium Racks","group":"default","events":257,"buyers":120,"conv":0.1643,"rev":1392.23,"os":"ios"},{"test":"IA","name":"1000 Energy Bundle V2","group":"default","events":157,"buyers":118,"conv":0.1615,"rev":1367.04,"os":"ios"},{"test":"IA","name":"500 Energy Bundle","group":"default","events":298,"buyers":222,"conv":0.3039,"rev":1300.55,"os":"ios"},{"test":"IA","name":"$2750 Cash Bundle","group":"default","events":87,"buyers":58,"conv":0.0794,"rev":1185.68,"os":"ios"},{"test":"IA","name":"Manager Pass Pro","group":"default","events":195,"buyers":184,"conv":0.2519,"rev":1097.98,"os":"ios"},{"test":"IA","name":"$8000 Cash Bundle","group":"default","events":28,"buyers":19,"conv":0.026,"rev":915.28,"os":"ios"},{"test":"IA","name":"VIP Rush Event","group":"default","events":116,"buyers":104,"conv":0.1424,"rev":886.98,"os":"ios"},{"test":"IA","name":"$1100 Cash Bundle","group":"default","events":97,"buyers":65,"conv":0.089,"rev":831.43,"os":"ios"},{"test":"IA","name":"Elite Manager Pass","group":"default","events":63,"buyers":61,"conv":0.0835,"rev":820.91,"os":"ios"},{"test":"IA","name":"100 Energy Bundle","group":"default","events":759,"buyers":466,"conv":0.638,"rev":816.74,"os":"ios"},{"test":"IA","name":"$500 Cash Bundle","group":"default","events":149,"buyers":98,"conv":0.1342,"rev":640.18,"os":"ios"},{"test":"IA","name":"Rolling Offers 6","group":"default","events":195,"buyers":172,"conv":0.2355,"rev":639.17,"os":"ios"},{"test":"IA","name":"$20000 Cash Bundle","group":"default","events":10,"buyers":9,"conv":0.0123,"rev":623.74,"os":"ios"},{"test":"IA","name":"2250 Energy Bundle","group":"default","events":35,"buyers":27,"conv":0.037,"rev":590.4,"os":"ios"},{"test":"IA","name":"Rolling Offers 2","group":"default","events":549,"buyers":444,"conv":0.6079,"rev":586.26,"os":"ios"},{"test":"IA","name":"Rolling Offers 10","group":"default","events":75,"buyers":66,"conv":0.0904,"rev":419.75,"os":"ios"},{"test":"IA","name":"Rolling Offers 14","group":"default","events":29,"buyers":23,"conv":0.0315,"rev":295.02,"os":"ios"},{"test":"IA","name":"VIP Rush Event Discounted","group":"default","events":48,"buyers":46,"conv":0.063,"rev":270.83,"os":"ios"},{"test":"IA","name":"Rolling Offers 18","group":"default","events":10,"buyers":9,"conv":0.0123,"rev":204.48,"os":"ios"},{"test":"IA","name":"Rolling Offers 22","group":"default","events":5,"buyers":4,"conv":0.0055,"rev":187.13,"os":"ios"},{"test":"IA","name":"$100 Cash Bundle","group":"default","events":138,"buyers":93,"conv":0.1273,"rev":145.57,"os":"ios"},{"test":"IA","name":"5000 Energy Bundle","group":"default","events":3,"buyers":3,"conv":0.0041,"rev":102.69,"os":"ios"},{"test":"IA","name":"Winter Pass 2025","group":"default","events":11,"buyers":10,"conv":0.0137,"rev":69.79,"os":"ios"},{"test":"IA","name":"Rolling Offers 26","group":"default","events":1,"buyers":1,"conv":0.0014,"rev":50.01,"os":"ios"},{"test":"IA","name":"Love pass 2025","group":"default","events":1,"buyers":1,"conv":0.0014,"rev":6.99,"os":"ios"},{"test":"IA","name":"Remove Ads All","group":"test_intrusive_seg_engaged_free","events":437,"buyers":422,"conv":0.5787,"rev":2469.58,"os":"ios"},{"test":"IA","name":"manager pass pro + elite","group":"test_intrusive_seg_engaged_free","events":121,"buyers":115,"conv":0.1577,"rev":1920.99,"os":"ios"},{"test":"IA","name":"1000 Energy Bundle V2","group":"test_intrusive_seg_engaged_free","events":200,"buyers":118,"conv":0.1618,"rev":1802.13,"os":"ios"},{"test":"IA","name":"$20000 Cash Bundle","group":"test_intrusive_seg_engaged_free","events":25,"buyers":9,"conv":0.0123,"rev":1502.97,"os":"ios"},{"test":"IA","name":"Starter Pack","group":"test_intrusive_seg_engaged_free","events":223,"buyers":210,"conv":0.288,"rev":1464.6,"os":"ios"},{"test":"IA","name":"500 Energy Bundle","group":"test_intrusive_seg_engaged_free","events":322,"buyers":229,"conv":0.314,"rev":1395.33,"os":"ios"},{"test":"IA","name":"Manager Pass Pro","group":"test_intrusive_seg_engaged_free","events":230,"buyers":215,"conv":0.2948,"rev":1364.83,"os":"ios"},{"test":"IA","name":"VIP Rush Event","group":"test_intrusive_seg_engaged_free","events":147,"buyers":127,"conv":0.1742,"rev":1132.78,"os":"ios"},{"test":"IA","name":"Premium Racks","group":"test_intrusive_seg_engaged_free","events":205,"buyers":119,"conv":0.1632,"rev":1130.3,"os":"ios"},{"test":"IA","name":"$2750 Cash Bundle","group":"test_intrusive_seg_engaged_free","events":74,"buyers":52,"conv":0.0713,"rev":1047.97,"os":"ios"},{"test":"IA","name":"Elite Manager Pass","group":"test_intrusive_seg_engaged_free","events":67,"buyers":65,"conv":0.0891,"rev":837.28,"os":"ios"},{"test":"IA","name":"100 Energy Bundle","group":"test_intrusive_seg_engaged_free","events":699,"buyers":435,"conv":0.5965,"rev":755.57,"os":"ios"},{"test":"IA","name":"$500 Cash Bundle","group":"test_intrusive_seg_engaged_free","events":147,"buyers":105,"conv":0.144,"rev":639.66,"os":"ios"},{"test":"IA","name":"Rolling Offers 6","group":"test_intrusive_seg_engaged_free","events":182,"buyers":150,"conv":0.2057,"rev":612.53,"os":"ios"},{"test":"IA","name":"$1100 Cash Bundle","group":"test_intrusive_seg_engaged_free","events":69,"buyers":54,"conv":0.074,"rev":601.43,"os":"ios"},{"test":"IA","name":"Rolling Offers 2","group":"test_intrusive_seg_engaged_free","events":539,"buyers":414,"conv":0.5677,"rev":584.68,"os":"ios"},{"test":"IA","name":"$8000 Cash Bundle","group":"test_intrusive_seg_engaged_free","events":16,"buyers":15,"conv":0.0206,"rev":532.13,"os":"ios"},{"test":"IA","name":"2250 Energy Bundle","group":"test_intrusive_seg_engaged_free","events":30,"buyers":20,"conv":0.0274,"rev":526.65,"os":"ios"},{"test":"IA","name":"Rolling Offers 10","group":"test_intrusive_seg_engaged_free","events":64,"buyers":52,"conv":0.0713,"rev":371.68,"os":"ios"},{"test":"IA","name":"Rolling Offers 18","group":"test_intrusive_seg_engaged_free","events":13,"buyers":9,"conv":0.0123,"rev":303.21,"os":"ios"},{"test":"IA","name":"Rolling Offers 14","group":"test_intrusive_seg_engaged_free","events":24,"buyers":18,"conv":0.0247,"rev":266.8,"os":"ios"},{"test":"IA","name":"Rolling Offers 22","group":"test_intrusive_seg_engaged_free","events":6,"buyers":4,"conv":0.0055,"rev":254.26,"os":"ios"},{"test":"IA","name":"Rolling Offers 26","group":"test_intrusive_seg_engaged_free","events":4,"buyers":2,"conv":0.0027,"rev":246.79,"os":"ios"},{"test":"IA","name":"VIP Rush Event Discounted","group":"test_intrusive_seg_engaged_free","events":35,"buyers":33,"conv":0.0453,"rev":194.91,"os":"ios"},{"test":"IA","name":"5000 Energy Bundle","group":"test_intrusive_seg_engaged_free","events":5,"buyers":4,"conv":0.0055,"rev":171.46,"os":"ios"},{"test":"IA","name":"$100 Cash Bundle","group":"test_intrusive_seg_engaged_free","events":134,"buyers":84,"conv":0.1152,"rev":140.84,"os":"ios"},{"test":"IA","name":"Winter Pass 2025","group":"test_intrusive_seg_engaged_free","events":18,"buyers":8,"conv":0.011,"rev":120.38,"os":"ios"},{"test":"IA","name":"10000 Energy Bundle","group":"test_intrusive_seg_engaged_free","events":1,"buyers":1,"conv":0.0014,"rev":55.68,"os":"ios"},{"test":"IA","name":"Love pass 2025","group":"test_intrusive_seg_engaged_free","events":1,"buyers":1,"conv":0.0014,"rev":1.16,"os":"ios"},{"test":"IA","name":"Remove Ads All","group":"test_intrusive_seg_purchaser","events":494,"buyers":459,"conv":0.6237,"rev":2665.09,"os":"ios"},{"test":"IA","name":"manager pass pro + elite","group":"test_intrusive_seg_purchaser","events":117,"buyers":107,"conv":0.1454,"rev":1862.28,"os":"ios"},{"test":"IA","name":"1000 Energy Bundle V2","group":"test_intrusive_seg_purchaser","events":171,"buyers":118,"conv":0.1603,"rev":1483.18,"os":"ios"},{"test":"IA","name":"Starter Pack","group":"test_intrusive_seg_purchaser","events":221,"buyers":210,"conv":0.2854,"rev":1448.98,"os":"ios"},{"test":"IA","name":"500 Energy Bundle","group":"test_intrusive_seg_purchaser","events":313,"buyers":230,"conv":0.3125,"rev":1364.84,"os":"ios"},{"test":"IA","name":"$20000 Cash Bundle","group":"test_intrusive_seg_purchaser","events":19,"buyers":14,"conv":0.019,"rev":1259.63,"os":"ios"},{"test":"IA","name":"Manager Pass Pro","group":"test_intrusive_seg_purchaser","events":207,"buyers":198,"conv":0.269,"rev":1132.8,"os":"ios"},{"test":"IA","name":"Premium Racks","group":"test_intrusive_seg_purchaser","events":210,"buyers":122,"conv":0.1658,"rev":1117.06,"os":"ios"},{"test":"IA","name":"VIP Rush Event","group":"test_intrusive_seg_purchaser","events":141,"buyers":130,"conv":0.1766,"rev":1072.96,"os":"ios"},{"test":"IA","name":"$2750 Cash Bundle","group":"test_intrusive_seg_purchaser","events":75,"buyers":60,"conv":0.0815,"rev":1032.42,"os":"ios"},{"test":"IA","name":"Elite Manager Pass","group":"test_intrusive_seg_purchaser","events":70,"buyers":66,"conv":0.0897,"rev":919.5,"os":"ios"},{"test":"IA","name":"100 Energy Bundle","group":"test_intrusive_seg_purchaser","events":820,"buyers":494,"conv":0.6713,"rev":889.85,"os":"ios"},{"test":"IA","name":"$8000 Cash Bundle","group":"test_intrusive_seg_purchaser","events":27,"buyers":23,"conv":0.0313,"rev":888.07,"os":"ios"},{"test":"IA","name":"$500 Cash Bundle","group":"test_intrusive_seg_purchaser","events":176,"buyers":106,"conv":0.144,"rev":737.4,"os":"ios"},{"test":"IA","name":"$1100 Cash Bundle","group":"test_intrusive_seg_purchaser","events":83,"buyers":53,"conv":0.072,"rev":687.55,"os":"ios"},{"test":"IA","name":"Rolling Offers 6","group":"test_intrusive_seg_purchaser","events":169,"buyers":141,"conv":0.1916,"rev":555.83,"os":"ios"},{"test":"IA","name":"Rolling Offers 2","group":"test_intrusive_seg_purchaser","events":512,"buyers":412,"conv":0.5598,"rev":550.35,"os":"ios"},{"test":"IA","name":"Rolling Offers 10","group":"test_intrusive_seg_purchaser","events":58,"buyers":49,"conv":0.0666,"rev":314.59,"os":"ios"},{"test":"IA","name":"2250 Energy Bundle","group":"test_intrusive_seg_purchaser","events":19,"buyers":17,"conv":0.0231,"rev":301.72,"os":"ios"},{"test":"IA","name":"VIP Rush Event Discounted","group":"test_intrusive_seg_purchaser","events":53,"buyers":51,"conv":0.0693,"rev":294.29,"os":"ios"},{"test":"IA","name":"10000 Energy Bundle","group":"test_intrusive_seg_purchaser","events":4,"buyers":3,"conv":0.0041,"rev":248.41,"os":"ios"},{"test":"IA","name":"5000 Energy Bundle","group":"test_intrusive_seg_purchaser","events":6,"buyers":6,"conv":0.0082,"rev":185.16,"os":"ios"},{"test":"IA","name":"Rolling Offers 14","group":"test_intrusive_seg_purchaser","events":17,"buyers":15,"conv":0.0204,"rev":180.96,"os":"ios"},{"test":"IA","name":"Rolling Offers 18","group":"test_intrusive_seg_purchaser","events":7,"buyers":4,"conv":0.0054,"rev":148.71,"os":"ios"},{"test":"IA","name":"$100 Cash Bundle","group":"test_intrusive_seg_purchaser","events":138,"buyers":90,"conv":0.1223,"rev":145.96,"os":"ios"},{"test":"IA","name":"Rolling Offers 22","group":"test_intrusive_seg_purchaser","events":3,"buyers":2,"conv":0.0027,"rev":107.58,"os":"ios"},{"test":"IA","name":"Winter Pass 2025","group":"test_intrusive_seg_purchaser","events":13,"buyers":10,"conv":0.0136,"rev":88.5,"os":"ios"},{"test":"IA","name":"Remove Ads Weekly","group":"test_intrusive_seg_purchaser","events":4,"buyers":2,"conv":0.0027,"rev":35.96,"os":"ios"}]},"overall":{"EM":{"default":{"tu":343899,"ltv7u":157655,"iap_conv":0.12,"iap_rev":4014.95,"ad_rev":8275.47,"total_rev":12290.41,"iap_rpu":0.0117,"ad_rpu":0.0241,"total_rpu":0.0357,"d1":33.25,"d3":14.85,"d7":6.02,"lv10":13.75,"ltv7":0.0392},"test":{"tu":344713,"ltv7u":157542,"iap_conv":0.11,"iap_rev":3768.63,"ad_rev":8289.13,"total_rev":12057.76,"iap_rpu":0.0109,"ad_rpu":0.024,"total_rpu":0.035,"d1":33.27,"d3":14.92,"d7":6.17,"lv10":14.64,"ltv7":0.0385}},"HP":{"default":{"tu":356816,"ltv7u":170254,"iap_conv":0.12,"iap_rev":4627.32,"ad_rev":8846.59,"total_rev":13473.91,"iap_rpu":0.013,"ad_rpu":0.0248,"total_rpu":0.0378,"d1":33.25,"d3":14.78,"d7":6.15,"lv10":14.06,"ltv7":0.0429},"test":{"tu":355364,"ltv7u":169579,"iap_conv":0.12,"iap_rev":4074.29,"ad_rev":9328.84,"total_rev":13403.13,"iap_rpu":0.0115,"ad_rpu":0.0263,"total_rpu":0.0377,"d1":33.62,"d3":15.16,"d7":6.23,"lv10":13.81,"ltv7":0.0412}},"IA":{"android":{"default":{"tu":169104,"iap_rev":2311.39,"ad_rev":5066.96,"total_rev":7378.33,"iap_conv":0.14,"iap_rpu":0.0136,"ad_rpu":0.03,"total_rpu":0.0436,"d1":33.7111,"d3":16.7524,"d7":8.6725,"lv10":26.1498,"ltv7":0.0437},"ef":{"tu":169120,"iap_rev":2183.27,"ad_rev":4882.61,"total_rev":7065.89,"iap_conv":0.13,"iap_rpu":0.0129,"ad_rpu":0.0289,"total_rpu":0.0418,"d1":33.5319,"d3":16.6277,"d7":8.4591,"lv10":26.0861,"ltv7":0.0448},"pu":{"tu":168673,"iap_rev":2769.46,"ad_rev":5187.17,"total_rev":7956.63,"iap_conv":0.13,"iap_rpu":0.0164,"ad_rpu":0.0307,"total_rpu":0.0472,"d1":33.554,"d3":16.5687,"d7":8.5006,"lv10":26.2371,"ltv7":0.0476}},"ios":{"default":{"tu":28941,"iap_rev":11177.6,"ad_rev":9787.36,"total_rev":20964.96,"iap_conv":2.71,"iap_rpu":0.3862,"ad_rpu":0.3382,"total_rpu":0.7244,"d1":36.183,"d3":20.7197,"d7":13.2844,"lv10":34.24,"ltv7":0.711},"ef":{"tu":28955,"iap_rev":9916.59,"ad_rev":10274.47,"total_rev":20191.05,"iap_conv":2.7,"iap_rpu":0.3425,"ad_rpu":0.3548,"total_rpu":0.6973,"d1":36.2779,"d3":21.1765,"d7":13.4215,"lv10":34.4279,"ltv7":0.7155},"pu":{"tu":29336,"iap_rev":12034.93,"ad_rev":10253.3,"total_rev":22288.23,"iap_conv":2.88,"iap_rpu":0.4102,"ad_rpu":0.3495,"total_rpu":0.7597,"d1":36.6185,"d3":20.5363,"d7":13.3795,"lv10":34.1632,"ltv7":0.7355}}}},"sample":{"EM":{"android":{"req":12483,"ctrl":331414,"test":331736,"mde":"5%","primary":"d1_retained","sufficient":true}},"HP":{"android":{"req":12605,"ctrl":344175,"test":342736,"mde":"5%","primary":"d1_retained","sufficient":true}},"IA":{"android":{"req":542423,"ctrl":421341,"test":421160,"mde":"7%","primary":"ad_revenue","sufficient":false,"still_needed":121082},"ios":{"req":69719,"ctrl":87293,"test":87680,"mde":"5%","primary":"ad_revenue","sufficient":true}}},"stats":{"EM":{"cashier":{"android":{"ad_revenue":{"uplift":"+0.00%","p":"1.000000","ci":"$-0.000859 to $0.000859","sig":false,"dir":"No Change","ctrl_mean":"$0.023900","test_mean":"$0.023900"},"iap_revenue":{"uplift":"-6.03%","p":"0.613648","ci":"$-0.003417 to $0.002017","sig":false,"dir":"Decreasing","ctrl_mean":"$0.011600","test_mean":"$0.010900"},"total_revenue":{"uplift":"-1.97%","p":"0.652913","ci":"$-0.003751 to $0.002351","sig":false,"dir":"Decreasing","ctrl_mean":"$0.035500","test_mean":"$0.034800"},"ltv_7":{"uplift":"-1.79%","p":"0.753625","ci":"$-0.005071 to $0.003671","sig":false,"dir":"Decreasing","ctrl_mean":"$0.039200","test_mean":"$0.038500"},"iap_conversion":{"uplift":"-8.33%","p":"0.219838","ci":"-0.0260% to 0.0060%","sig":false,"dir":"Decreasing","ctrl_mean":"0.1200%","test_mean":"0.1100%"},"d1_retained":{"uplift":"+0.06%","p":"0.862996","ci":"-0.2072% to 0.2472%","sig":false,"dir":"Increasing","ctrl_mean":"33.4700%","test_mean":"33.4900%"},"d3_retained":{"uplift":"+0.47%","p":"0.482656","ci":"-0.1254% to 0.2654%","sig":false,"dir":"Increasing","ctrl_mean":"14.9800%","test_mean":"15.0500%"},"d7_retained":{"uplift":"+2.11%","p":"0.175200","ci":"-0.0579% to 0.3179%","sig":false,"dir":"Increasing","ctrl_mean":"6.1500%","test_mean":"6.2800%"},"level_10_completion":{"uplift":"+6.46%","p":"0.0000e+00","ci":"0.7255% to 1.0545%","sig":true,"dir":"Increasing","ctrl_mean":"13.7800%","test_mean":"14.6700%"}}}},"HP":{"bonus":{"android":{"ad_revenue":{"uplift":"+6.05%","p":"0.141231","ci":"$-0.000498 to $0.003498","sig":false,"dir":"Increasing","ctrl_mean":"$0.024800","test_mean":"$0.026300"},"iap_revenue":{"uplift":"-11.54%","p":"0.347525","ci":"$-0.004630 to $0.001630","sig":false,"dir":"Decreasing","ctrl_mean":"$0.013000","test_mean":"$0.011500"},"total_revenue":{"uplift":"-0.26%","p":"0.959648","ci":"$-0.003974 to $0.003774","sig":false,"dir":"Decreasing","ctrl_mean":"$0.037800","test_mean":"$0.037700"},"ltv_7":{"uplift":"-3.96%","p":"0.542939","ci":"$-0.007177 to $0.003777","sig":false,"dir":"Decreasing","ctrl_mean":"$0.042900","test_mean":"$0.041200"},"iap_conversion":{"uplift":"+0.00%","p":"1.000000","ci":"-0.0161% to 0.0161%","sig":false,"dir":"No Change","ctrl_mean":"0.1200%","test_mean":"0.1200%"},"d1_retained":{"uplift":"+1.11%","p":"0.001153","ci":"0.1469% to 0.5931%","sig":true,"dir":"Increasing","ctrl_mean":"33.2500%","test_mean":"33.6200%"},"d3_retained":{"uplift":"+2.57%","p":"9.4532e-05","ci":"0.1892% to 0.5708%","sig":true,"dir":"Increasing","ctrl_mean":"14.7800%","test_mean":"15.1600%"},"d7_retained":{"uplift":"+1.30%","p":"0.381267","ci":"-0.0991% to 0.2591%","sig":false,"dir":"Increasing","ctrl_mean":"6.1500%","test_mean":"6.2300%"},"level_10_completion":{"uplift":"-1.78%","p":"0.002315","ci":"-0.4108% to -0.0892%","sig":true,"dir":"Decreasing","ctrl_mean":"14.0600%","test_mean":"13.8100%"}}}},"IA":{"ef":{"android":{"ad_revenue":{"uplift":"-2.12%","p":"0.449795","ci":"$-0.002515 to $0.001115","sig":false,"dir":"Decreasing","ctrl_mean":"$0.033000","test_mean":"$0.032300"},"iap_revenue":{"uplift":"+6.78%","p":"0.472672","ci":"$-0.002075 to $0.004475","sig":false,"dir":"Increasing","ctrl_mean":"$0.017700","test_mean":"$0.018900"},"total_revenue":{"uplift":"+0.99%","p":"0.803400","ci":"$-0.003436 to $0.004436","sig":false,"dir":"Increasing","ctrl_mean":"$0.050700","test_mean":"$0.051200"},"ltv_7":{"uplift":"+3.67%","p":"0.412683","ci":"$-0.002646 to $0.006446","sig":false,"dir":"Increasing","ctrl_mean":"$0.051800","test_mean":"$0.053700"},"ltv_14":{"uplift":"+0.60%","p":"0.933434","ci":"$-0.013479 to $0.014679","sig":false,"dir":"Increasing","ctrl_mean":"$0.100600","test_mean":"$0.101200"},"iap_conversion":{"uplift":"+0.00%","p":"1.000000","ci":"-0.0191% to 0.0191%","sig":false,"dir":"No Change","ctrl_mean":"0.2000%","test_mean":"0.2000%"},"d1_retained":{"uplift":"-0.67%","p":"0.033478","ci":"-0.4228% to -0.0172%","sig":true,"dir":"Decreasing","ctrl_mean":"32.9400%","test_mean":"32.7200%"},"d3_retained":{"uplift":"+0.06%","p":"0.910449","ci":"-0.1643% to 0.1843%","sig":false,"dir":"Increasing","ctrl_mean":"16.7600%","test_mean":"16.7700%"},"d7_retained":{"uplift":"-0.11%","p":"0.902640","ci":"-0.1702% to 0.1502%","sig":false,"dir":"Decreasing","ctrl_mean":"9.1800%","test_mean":"9.1700%"},"level_10_completion":{"uplift":"+0.04%","p":"0.917000","ci":"-0.1781% to 0.1981%","sig":false,"dir":"Increasing","ctrl_mean":"26.3300%","test_mean":"26.3400%"}},"ios":{"ad_revenue":{"uplift":"+2.07%","p":"0.210955","ci":"$-0.002664 to $0.012064","sig":false,"dir":"Increasing","ctrl_mean":"$0.227000","test_mean":"$0.231700"},"iap_revenue":{"uplift":"+1.49%","p":"0.841653","ci":"$-0.040529 to $0.049729","sig":false,"dir":"Increasing","ctrl_mean":"$0.308000","test_mean":"$0.312600"},"total_revenue":{"uplift":"+1.70%","p":"0.707313","ci":"$-0.038403 to $0.056603","sig":false,"dir":"Increasing","ctrl_mean":"$0.535100","test_mean":"$0.544200"},"ltv_7":{"uplift":"+4.46%","p":"0.421259","ci":"$-0.034201 to $0.081801","sig":false,"dir":"Increasing","ctrl_mean":"$0.533100","test_mean":"$0.556900"},"ltv_14":{"uplift":"+4.82%","p":"0.530692","ci":"$-0.080794 to $0.156794","sig":false,"dir":"Increasing","ctrl_mean":"$0.787800","test_mean":"$0.825800"},"iap_conversion":{"uplift":"-3.33%","p":"0.270916","ci":"-0.2224% to 0.0624%","sig":false,"dir":"Decreasing","ctrl_mean":"2.4000%","test_mean":"2.3200%"},"d1_retained":{"uplift":"+0.05%","p":"0.932165","ci":"-0.4405% to 0.4805%","sig":false,"dir":"Increasing","ctrl_mean":"38.6000%","test_mean":"38.6200%"},"d3_retained":{"uplift":"+1.13%","p":"0.231871","ci":"-0.1662% to 0.6862%","sig":false,"dir":"Increasing","ctrl_mean":"23.0800%","test_mean":"23.3400%"},"d7_retained":{"uplift":"+0.87%","p":"0.544499","ci":"-0.2904% to 0.5504%","sig":false,"dir":"Increasing","ctrl_mean":"14.9400%","test_mean":"15.0700%"},"level_10_completion":{"uplift":"+1.10%","p":"0.060713","ci":"-0.0198% to 0.8998%","sig":false,"dir":"Increasing","ctrl_mean":"39.9200%","test_mean":"40.3600%"}}},"pu":{"android":{"ad_revenue":{"uplift":"+1.82%","p":"0.554563","ci":"$-0.001390 to $0.002590","sig":false,"dir":"Increasing","ctrl_mean":"$0.033000","test_mean":"$0.033600"},"iap_revenue":{"uplift":"+10.17%","p":"0.291822","ci":"$-0.001547 to $0.005147","sig":false,"dir":"Increasing","ctrl_mean":"$0.017700","test_mean":"$0.019500"},"total_revenue":{"uplift":"+4.73%","p":"0.249602","ci":"$-0.001686 to $0.006486","sig":false,"dir":"Increasing","ctrl_mean":"$0.050700","test_mean":"$0.053100"},"ltv_7":{"uplift":"+5.41%","p":"0.227800","ci":"$-0.001750 to $0.007350","sig":false,"dir":"Increasing","ctrl_mean":"$0.051800","test_mean":"$0.054600"},"ltv_14":{"uplift":"+3.18%","p":"0.637407","ci":"$-0.010107 to $0.016507","sig":false,"dir":"Increasing","ctrl_mean":"$0.100600","test_mean":"$0.103800"},"iap_conversion":{"uplift":"+0.00%","p":"1.000000","ci":"-0.0191% to 0.0191%","sig":false,"dir":"No Change","ctrl_mean":"0.2000%","test_mean":"0.2000%"},"d1_retained":{"uplift":"-0.33%","p":"0.287988","ci":"-0.3129% to 0.0929%","sig":false,"dir":"Decreasing","ctrl_mean":"32.9400%","test_mean":"32.8300%"},"d3_retained":{"uplift":"-0.24%","p":"0.652659","ci":"-0.2142% to 0.1342%","sig":false,"dir":"Decreasing","ctrl_mean":"16.7600%","test_mean":"16.7200%"},"d7_retained":{"uplift":"-0.98%","p":"0.270126","ci":"-0.2500% to 0.0700%","sig":false,"dir":"Decreasing","ctrl_mean":"9.1800%","test_mean":"9.0900%"},"level_10_completion":{"uplift":"+0.15%","p":"0.676961","ci":"-0.1482% to 0.2282%","sig":false,"dir":"Increasing","ctrl_mean":"26.3300%","test_mean":"26.3700%"}},"ios":{"ad_revenue":{"uplift":"+0.88%","p":"0.583431","ci":"$-0.005148 to $0.009148","sig":false,"dir":"Increasing","ctrl_mean":"$0.227000","test_mean":"$0.229000"},"iap_revenue":{"uplift":"-1.72%","p":"0.781557","ci":"$-0.042762 to $0.032162","sig":false,"dir":"Decreasing","ctrl_mean":"$0.308000","test_mean":"$0.302700"},"total_revenue":{"uplift":"-0.64%","p":"0.868149","ci":"$-0.043541 to $0.036741","sig":false,"dir":"Decreasing","ctrl_mean":"$0.535100","test_mean":"$0.531700"},"ltv_7":{"uplift":"-0.36%","p":"0.938092","ci":"$-0.049846 to $0.046046","sig":false,"dir":"Decreasing","ctrl_mean":"$0.533100","test_mean":"$0.531200"},"ltv_14":{"uplift":"+6.65%","p":"0.377552","ci":"$-0.063986 to $0.168786","sig":false,"dir":"Increasing","ctrl_mean":"$0.787800","test_mean":"$0.840200"},"iap_conversion":{"uplift":"+2.08%","p":"0.496066","ci":"-0.0940% to 0.1940%","sig":false,"dir":"Increasing","ctrl_mean":"2.4000%","test_mean":"2.4500%"},"d1_retained":{"uplift":"-0.39%","p":"0.522280","ci":"-0.6095% to 0.3095%","sig":false,"dir":"Decreasing","ctrl_mean":"38.6000%","test_mean":"38.4500%"},"d3_retained":{"uplift":"-0.91%","p":"0.331637","ci":"-0.6340% to 0.2140%","sig":false,"dir":"Decreasing","ctrl_mean":"23.0800%","test_mean":"22.8700%"},"d7_retained":{"uplift":"+1.34%","p":"0.351216","ci":"-0.2205% to 0.6205%","sig":false,"dir":"Increasing","ctrl_mean":"14.9400%","test_mean":"15.1400%"},"level_10_completion":{"uplift":"+0.35%","p":"0.549606","ci":"-0.3186% to 0.5986%","sig":false,"dir":"Increasing","ctrl_mean":"39.9200%","test_mean":"40.0600%"}}}}}};
+
+/* ---------- meta ---------- */
+var TESTS = {
+  EM: { title:'Employee Management', test_name:'test_ems_cashier_trial',
+        variants:[['test','EMS Cashier Trial']], platforms:['android'],
+        primary:'d1_retained', primary_label:'D1 Retention', mde:'5%',
+        verdict:'DO NOT ROLL OUT', verdict_cls:'noroll', stats_key:'cashier',
+        verdict_note:'Primary D1 retention is null (+0.06%, p=0.863) at full power. Level 10 completion is significant (+6.46%, p<0.001) but secondary — not sufficient to justify rollout on the primary metric.' },
+  HP: { title:'Hot Products', test_name:'test_hot_products_bonus_activated',
+        variants:[['test','Hot Products Bonus']], platforms:['android'],
+        primary:'d1_retained', primary_label:'D1 Retention', mde:'5%',
+        verdict:'CONSIDER ROLLOUT', verdict_cls:'roll', stats_key:'bonus',
+        verdict_note:'Primary D1 retention significant (+1.11%, p=0.001) and D3 significant (+2.57%, p<0.001). Level 10 down (-1.78%, p=0.002) — monitor progression post-launch.' },
+  IA: { title:'Intrusive Ads', test_name:'test_intrusive_seg_*',
+        variants:[['ef','Engaged Free'],['pu','Purchaser']], platforms:['android','ios'],
+        primary:'ad_revenue', primary_label:'Ad Revenue', mde:'Android 7% / iOS 5%',
+        verdict:'DO NOT ROLL OUT', verdict_cls:'noroll', stats_key:null,
+        verdict_note:'Primary ad_revenue null across all variant×platform combos. EF shows a significant D1 retention drop on Android (-0.67%, p=0.033). Android is underpowered for ad_revenue (needs +121k/group).' }
+};
+var GROUP_MAP = {
+  EM:{ 'default':'default','test':'test_ems_cashier_trial' },
+  HP:{ 'default':'default','test':'test_hot_products_bonus_activated' },
+  IA:{ 'default':'default','ef':'test_intrusive_seg_engaged_free','pu':'test_intrusive_seg_purchaser' }
+};
+var METRIC_ORDER = ['ad_revenue','iap_revenue','total_revenue','ltv_7','ltv_14','iap_conversion','d1_retained','d3_retained','d7_retained','level_10_completion'];
+var METRIC_LABEL = { ad_revenue:'Ad Revenue/User', iap_revenue:'IAP Revenue/User', total_revenue:'Total Revenue/User',
+  ltv_7:'LTV-7', ltv_14:'LTV-14', iap_conversion:'IAP Conversion', d1_retained:'D1 Retention',
+  d3_retained:'D3 Retention', d7_retained:'D7 Retention', level_10_completion:'Level 10 Completion' };
+
+/* ---------- state ---------- */
+var state = { test:'EM', country:new Set(), platform:'android', cannPlacements:new Set() };
+var charts = {};
+
+/* ---------- helpers ---------- */
+function fmtInt(v){ return Math.round(v).toLocaleString('en-US'); }
+function fmtUsd(v){ if(Math.abs(v)>=1000) return '$'+(v/1000).toFixed(v>=10000?0:1)+'k'; return '$'+v.toFixed(2); }
+function fmtUsd4(v){ return '$'+v.toFixed(4); }
+function fmtPct(v,d){ if(d===undefined)d=2; return v.toFixed(d)+'%'; }
+function el(id){ return document.getElementById(id); }
+function pctDelta(t,c){ return c!==0 ? (t-c)/c*100 : 0; }
+
+/* ---------- aggregation over filtered country rows ---------- */
+function rowsFor(test, group){
+  var rows = DATA.country[test].filter(function(r){ return r.group===group; });
+  if(state.country.size>0) rows = rows.filter(function(r){ return state.country.has(r.country); });
+  rows = rows.filter(function(r){ return r.os===state.platform; });
+  return rows;
+}
+function aggregate(rows){
+  var tu = rows.reduce(function(a,r){return a+r.tu;},0);
+  if(tu===0) return null;
+  function w(k){ return rows.reduce(function(a,r){return a+r[k]*r.tu;},0)/tu; }
+  function s(k){ return rows.reduce(function(a,r){return a+r[k];},0); }
+  return {
+    tu:tu, ltv7_users:s('ltv7_users'),
+    iap_rev:s('iap_rev'), ad_rev:s('ad_rev'), total_rev:s('total_rev'),
+    iap_conv:w('iap_conv'), iap_rpu:w('iap_rpu'), ad_rpu:w('ad_rpu'), total_rpu:w('total_rpu'),
+    d1:w('d1'), d3:w('d3'), d7:w('d7'), lv10:w('lv10'), ltv7:w('ltv7')
+  };
+}
+function groupAgg(test, groupKey){
+  var realGroup = GROUP_MAP[test][groupKey];
+  return aggregate(rowsFor(test, realGroup));
+}
+
+/* ---------- KPI card builder ---------- */
+function kpiCard(label, value, sub, deltaPct){
+  var deltaHtml = '';
+  if(deltaPct!==undefined && deltaPct!==null){
+    var cls = deltaPct>0?'pos':deltaPct<0?'neg':'';
+    var col = deltaPct>0?'var(--economy)':deltaPct<0?'#B91C1C':'var(--ink-3)';
+    deltaHtml = '<span style="color:'+col+'">'+(deltaPct>=0?'+':'')+deltaPct.toFixed(1)+'% vs ctl</span>';
+  }
+  return '<div class="kpi"><div class="kpi-label">'+label+'</div>'+
+    '<div class="kpi-value small">'+value+'</div>'+
+    '<div class="kpi-sub">'+(sub||'')+deltaHtml+'</div></div>';
+}
+
+/* ---------- render everything ---------- */
+function render(){
+  var test = state.test;
+  var T = TESTS[test];
+
+  var ctrl = groupAgg(test, 'default');
+  // all variant aggregates
+  var variants = T.variants.map(function(v){ return { key:v[0], label:v[1], a:groupAgg(test,v[0]) }; });
+  var firstTest = variants[0].a;
+
+  /* cohort strip */
+  el('stat-ctrl').innerHTML = ctrl?fmtInt(ctrl.tu)+'<span class="unit">users</span>':'—';
+  var testTotal = variants.reduce(function(s,v){ return s + (v.a?v.a.tu:0); },0);
+  el('stat-test').innerHTML = testTotal?fmtInt(testTotal)+'<span class="unit">users</span>':'—';
+  el('stat-primary').textContent = T.primary_label;
+  var samp = DATA.sample[test];
+  var suff = samp[state.platform] && samp[state.platform].sufficient;
+  el('stat-suff').innerHTML = suff ? '<span style="color:#065F46">✓ Sufficient</span>' : '<span style="color:#B91C1C">✗ Underpowered</span>';
+
+  /* verdict */
+  el('verdict-mount').innerHTML =
+    '<div class="verdict-banner '+T.verdict_cls+'"><div><div class="vb-label">Recommendation · '+T.title+' · '+(state.platform==='ios'?'iOS':'Android')+'</div>'+
+    '<div class="vb-verdict">'+(T.verdict_cls==='roll'?'✓ ':'⛔ ')+T.verdict+'</div></div>'+
+    '<div class="vb-note">'+T.verdict_note+'</div></div>';
+
+  el('colophon-test').textContent = T.test_name;
+
+  renderAB(test, ctrl, variants);
+  renderStats(test);
+  renderCann(test);
+  renderMonetization(test, ctrl, variants);
+  renderEngagement(test, ctrl, variants);
+}
+
+/* ---------- A/B strip ---------- */
+function renderAB(test, ctrl, variants){
+  var T = TESTS[test];
+  el('ab-test-label').textContent = T.test_name;
+  var aggs = [{ key:'default', label:'Default', a:ctrl }].concat(variants);
+  var totalN = aggs.reduce(function(s,g){ return s + (g.a?g.a.tu:0); },0);
+  el('ab-test-meta').textContent = variants.length + ' variant'+(variants.length===1?'':'s')+' vs default · '+(state.platform==='ios'?'iOS':'Android')+' · N = '+fmtInt(totalN);
+
+  var ctlA = ctrl;
+  var metrics = [
+    ['Cohort N', function(a){return fmtInt(a.tu);}, function(a){return a.tu;}, true],
+    ['D1 Retention', function(a){return a.d1.toFixed(2)+'%';}, function(a){return a.d1;}],
+    ['D3 Retention', function(a){return a.d3.toFixed(2)+'%';}, function(a){return a.d3;}],
+    ['D7 Retention', function(a){return a.d7.toFixed(2)+'%';}, function(a){return a.d7;}],
+    ['Level 10 %', function(a){return a.lv10.toFixed(2)+'%';}, function(a){return a.lv10;}],
+    ['IAP Conversion', function(a){return a.iap_conv.toFixed(3)+'%';}, function(a){return a.iap_conv;}],
+    ['Ad Rev/User', function(a){return fmtUsd4(a.ad_rpu);}, function(a){return a.ad_rpu;}],
+    ['IAP Rev/User', function(a){return fmtUsd4(a.iap_rpu);}, function(a){return a.iap_rpu;}],
+    ['Total Rev/User', function(a){return fmtUsd4(a.total_rpu);}, function(a){return a.total_rpu;}],
+    ['LTV-7', function(a){return fmtUsd4(a.ltv7);}, function(a){return a.ltv7;}]
+  ];
+  var html = '<thead><tr><th>Metric</th>';
+  aggs.forEach(function(g){ html += '<th class="'+(g.key==='default'?'control-col':'')+'">'+g.label+(g.key==='default'?' · base':'')+'</th>'; });
+  html += '</tr></thead><tbody>';
+  metrics.forEach(function(m){
+    html += '<tr><td>'+m[0]+'</td>';
+    aggs.forEach(function(g){
+      if(!g.a){ html+='<td>—</td>'; return; }
+      var disp = m[1](g.a);
+      var delta = '';
+      if(g.key!=='default' && !m[3] && ctlA){
+        var d = pctDelta(m[2](g.a), m[2](ctlA));
+        var cls = d>0?'pos':d<0?'neg':'';
+        delta = '<span class="delta '+cls+'">'+(d>=0?'+':'')+d.toFixed(1)+'% vs ctl</span>';
+      }
+      html += '<td>'+disp+delta+'</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  el('ab-table').innerHTML = html;
+}
+
+/* ---------- Monetization ---------- */
+function renderMonetization(ctrl, testg, vlabel){
+  if(!ctrl||!testg){ el('mon-kpis').innerHTML='<div class="kpi"><div class="kpi-value">—</div></div>'; return; }
+  el('mon-kpis').innerHTML =
+    kpiCard('IAP Conversion', testg.iap_conv.toFixed(3)+'%', '<span>mature cohort</span>', pctDelta(testg.iap_conv,ctrl.iap_conv)) +
+    kpiCard('IAP Rev / User', fmtUsd4(testg.iap_rpu), '<span>per user</span>', pctDelta(testg.iap_rpu,ctrl.iap_rpu)) +
+    kpiCard('Ad Rev / User', fmtUsd4(testg.ad_rpu), '<span>per user</span>', pctDelta(testg.ad_rpu,ctrl.ad_rpu)) +
+    kpiCard('Total Rev / User', fmtUsd4(testg.total_rpu), '<span>per user</span>', pctDelta(testg.total_rpu,ctrl.total_rpu)) +
+    kpiCard('LTV-7', fmtUsd4(testg.ltv7), '<span>7-day proxy</span>', pctDelta(testg.ltv7,ctrl.ltv7));
+  el('rev-meta').textContent = 'test '+fmtInt(testg.tu)+' · ctl '+fmtInt(ctrl.tu);
+  el('ltv-meta').textContent = 'LTV-7 per user';
+
+  mkBar('ch-rev', ['IAP/U','Ad/U','Total/U'],
+    [ctrl.iap_rpu, ctrl.ad_rpu, ctrl.total_rpu],
+    [testg.iap_rpu, testg.ad_rpu, testg.total_rpu], vlabel, '$', 4);
+  mkBar('ch-ltv', ['LTV-7'], [ctrl.ltv7], [testg.ltv7], vlabel, '$', 4);
+}
+
+/* ---------- Engagement ---------- */
+function renderEngagement(ctrl, testg, vlabel){
+  if(!ctrl||!testg){ el('eng-kpis').innerHTML=''; return; }
+  el('eng-kpis').innerHTML =
+    kpiCard('D1 Retention', testg.d1.toFixed(2)+'%', '<span>next-day return</span>', pctDelta(testg.d1,ctrl.d1)) +
+    kpiCard('D3 Retention', testg.d3.toFixed(2)+'%', '<span>3-day return</span>', pctDelta(testg.d3,ctrl.d3)) +
+    kpiCard('D7 Retention', testg.d7.toFixed(2)+'%', '<span>7-day return</span>', pctDelta(testg.d7,ctrl.d7)) +
+    kpiCard('Level 10 %', testg.lv10.toFixed(2)+'%', '<span>progression</span>', pctDelta(testg.lv10,ctrl.lv10));
+  el('ret-meta').textContent = 'D1 · D3 · D7';
+  el('lv-meta').textContent = 'completion %';
+  mkBar('ch-ret', ['D1','D3','D7'], [ctrl.d1,ctrl.d3,ctrl.d7], [testg.d1,testg.d3,testg.d7], vlabel, '', 2, '%');
+  mkBar('ch-lv', ['Level 10'], [ctrl.lv10], [testg.lv10], vlabel, '', 2, '%');
+}
+
+/* ---------- chart helper ---------- */
+/* ---------- Monetization ---------- */
+var GROUP_COLORS = ['#1A1611','#0F766E','#B45309'];  // default, variant1, variant2
+function seriesFor(ctrl, variants){
+  var s = [{ label:'Default', a:ctrl, color:GROUP_COLORS[0] }];
+  variants.forEach(function(v,i){ s.push({ label:v.label, a:v.a, color:GROUP_COLORS[(i+1)%GROUP_COLORS.length] }); });
+  return s.filter(function(x){ return x.a; });
+}
+function renderMonetization(test, ctrl, variants){
+  if(!ctrl){ el('mon-kpis').innerHTML='<div class="kpi"><div class="kpi-value">—</div></div>'; return; }
+  var primaryV = variants[0].a;
+  // KPI cards reflect first variant vs ctrl (plus a note for multi-variant)
+  el('mon-kpis').innerHTML =
+    kpiCard('IAP Conversion', primaryV.iap_conv.toFixed(3)+'%', '<span>'+variants[0].label+'</span>', pctDelta(primaryV.iap_conv,ctrl.iap_conv)) +
+    kpiCard('IAP Rev / User', fmtUsd4(primaryV.iap_rpu), '<span>per user</span>', pctDelta(primaryV.iap_rpu,ctrl.iap_rpu)) +
+    kpiCard('Ad Rev / User', fmtUsd4(primaryV.ad_rpu), '<span>per user</span>', pctDelta(primaryV.ad_rpu,ctrl.ad_rpu)) +
+    kpiCard('Total Rev / User', fmtUsd4(primaryV.total_rpu), '<span>per user</span>', pctDelta(primaryV.total_rpu,ctrl.total_rpu)) +
+    kpiCard('LTV-7', fmtUsd4(primaryV.ltv7), '<span>7-day proxy</span>', pctDelta(primaryV.ltv7,ctrl.ltv7));
+  el('rev-meta').textContent = (state.platform==='ios'?'iOS':'Android')+' · ctl '+fmtInt(ctrl.tu);
+  el('ltv-meta').textContent = 'LTV-7 · indexed to Default = 100';
+
+  var series = seriesFor(ctrl, variants);
+  // Revenue per user — grouped bar
+  mkGroupedBar('ch-rev', ['IAP/U','Ad/U','Total/U'], series.map(function(s){
+    return { label:s.label, color:s.color, data:[s.a.iap_rpu, s.a.ad_rpu, s.a.total_rpu] };
+  }), '$', 4);
+  // LTV-7 — indexed line chart (Default=100) so small differences are visible
+  var base = ctrl.ltv7 || 1;
+  mkIndexLine('ch-ltv', series.map(function(s){
+    return { label:s.label, color:s.color, value: s.a.ltv7/base*100, raw:s.a.ltv7 };
+  }), 'LTV-7');
+}
+
+/* ---------- Engagement ---------- */
+function renderEngagement(test, ctrl, variants){
+  if(!ctrl){ el('eng-kpis').innerHTML=''; return; }
+  var primaryV = variants[0].a;
+  el('eng-kpis').innerHTML =
+    kpiCard('D1 Retention', primaryV.d1.toFixed(2)+'%', '<span>next-day</span>', pctDelta(primaryV.d1,ctrl.d1)) +
+    kpiCard('D3 Retention', primaryV.d3.toFixed(2)+'%', '<span>3-day</span>', pctDelta(primaryV.d3,ctrl.d3)) +
+    kpiCard('D7 Retention', primaryV.d7.toFixed(2)+'%', '<span>7-day</span>', pctDelta(primaryV.d7,ctrl.d7)) +
+    kpiCard('Level 10 %', primaryV.lv10.toFixed(2)+'%', '<span>progression</span>', pctDelta(primaryV.lv10,ctrl.lv10));
+  el('ret-meta').textContent = 'side-by-side bars';
+  el('lv-meta').textContent = 'Δ% vs Default';
+
+  var series = seriesFor(ctrl, variants);
+  // Retention — grouped bars per day (D1/D3/D7) so each day's groups sit side by side
+  mkGroupedBar('ch-ret', ['D1','D3','D7'], series.map(function(s){
+    return { label:s.label, color:s.color, data:[s.a.d1, s.a.d3, s.a.d7] };
+  }), '', 2, '%');
+  // Level 10 — uplift line vs Default (diverging around 0) makes tiny differences visible
+  var lvlSeries = variants.map(function(v,i){
+    return { label:v.label, color:GROUP_COLORS[(i+1)%GROUP_COLORS.length],
+      data:[ pctDelta(v.a.d1,ctrl.d1), pctDelta(v.a.d3,ctrl.d3), pctDelta(v.a.d7,ctrl.d7), pctDelta(v.a.lv10,ctrl.lv10) ] };
+  });
+  mkUpliftLine('ch-lv', ['D1','D3','D7','Lv10'], lvlSeries);
+}
+
+/* ---------- chart helpers ---------- */
+function baseOpts(prefix, digits, suffix, fmtFn){
+  prefix=prefix||''; suffix=suffix||''; digits=digits===undefined?2:digits;
+  return { responsive:true, maintainAspectRatio:false,
+    interaction:{ mode:'index', intersect:false },
+    plugins:{ legend:{ display:true, position:'top', labels:{ boxWidth:10, font:{size:10}, color:'#4A4337', usePointStyle:true } },
+      tooltip:{ callbacks:{ label:function(c){ return ' '+c.dataset.label+': '+(fmtFn?fmtFn(c.parsed.y):prefix+c.parsed.y.toFixed(digits)+suffix); } } } },
+    scales:{ x:{ grid:{display:false} }, y:{ grid:{color:'#E3DCCA'}, ticks:{ callback:function(v){ return prefix+(+v).toFixed(digits>2?2:digits)+suffix; } } } } };
+}
+function mkGroupedBar(id, labels, series, prefix, digits, suffix){
+  if(typeof Chart==='undefined') return;
+  try {
+    if(charts[id]) charts[id].destroy();
+    var cv = el(id); if(!cv) return;
+    charts[id] = new Chart(cv, {
+      type:'bar',
+      data:{ labels:labels, datasets: series.map(function(s){
+        return { label:s.label, data:s.data, backgroundColor:s.color, borderRadius:2, maxBarThickness:54 };
+      })},
+      options: baseOpts(prefix, digits, suffix)
+    });
+  } catch(e){}
+}
+function mkLine(id, labels, series, suffix){
+  if(typeof Chart==='undefined') return;
+  suffix=suffix||'';
+  try {
+    if(charts[id]) charts[id].destroy();
+    var cv = el(id); if(!cv) return;
+    // compute tight y-range so small differences between groups are visible
+    var allVals = [];
+    series.forEach(function(s){ s.data.forEach(function(v){ if(typeof v==='number') allVals.push(v); }); });
+    var lo = Math.min.apply(null, allVals), hi = Math.max.apply(null, allVals);
+    var pad = Math.max((hi-lo)*0.25, hi*0.02, 0.3);
+    var o = baseOpts('',2,suffix);
+    o.scales.y.beginAtZero=false;
+    o.scales.y.min = Math.max(0, lo - pad);
+    o.scales.y.max = hi + pad;
+    charts[id] = new Chart(cv, {
+      type:'line',
+      data:{ labels:labels, datasets: series.map(function(s){
+        return { label:s.label, data:s.data, borderColor:s.color, backgroundColor:s.color,
+          borderWidth:2.5, pointRadius:5, pointHoverRadius:7, tension:0.25, fill:false };
+      })},
+      options: o
+    });
+  } catch(e){}
+}
+function mkUpliftLine(id, labels, series){
+  if(typeof Chart==='undefined') return;
+  try {
+    if(charts[id]) charts[id].destroy();
+    var cv = el(id); if(!cv) return;
+    var o = baseOpts('',2,'%');
+    o.scales.y.beginAtZero=false;
+    o.plugins.tooltip.callbacks.label=function(c){ return ' '+c.dataset.label+': '+(c.parsed.y>=0?'+':'')+c.parsed.y.toFixed(2)+'% vs ctl'; };
+    o.scales.y.ticks.callback=function(v){ return (v>0?'+':'')+(+v).toFixed(1)+'%'; };
+    charts[id] = new Chart(cv, {
+      type:'line',
+      data:{ labels:labels, datasets: series.map(function(s){
+        return { label:s.label, data:s.data, borderColor:s.color, backgroundColor:s.color,
+          borderWidth:2.5, pointRadius:5, pointHoverRadius:7, tension:0.2, fill:false };
+      })},
+      options: o
+    });
+  } catch(e){}
+}
+function mkIndexLine(id, points, label){
+  // horizontal "lollipop"-style index chart: each group as a bar indexed to 100
+  if(typeof Chart==='undefined') return;
+  try {
+    if(charts[id]) charts[id].destroy();
+    var cv = el(id); if(!cv) return;
+    charts[id] = new Chart(cv, {
+      type:'bar',
+      data:{ labels:points.map(function(p){return p.label;}),
+        datasets:[{ label:label+' (indexed, Default=100)', data:points.map(function(p){return +p.value.toFixed(2);}),
+          backgroundColor:points.map(function(p){return p.color;}), borderRadius:3, maxBarThickness:40 }] },
+      options:(function(){
+        var o = baseOpts('',1,''); o.indexAxis='y';
+        o.plugins.legend.display=false;
+        o.plugins.tooltip.callbacks.label=function(c){
+          var p=points[c.dataIndex];
+          return ' '+p.label+': index '+(+c.parsed.x).toFixed(1)+'  ($'+p.raw.toFixed(4)+')';
+        };
+        o.scales={ x:{ grid:{color:'#E3DCCA'}, ticks:{ callback:function(v){return (+v).toFixed(0);} }, title:{display:true,text:'Index (Default = 100)',font:{size:9},color:'#857C6A'} },
+                   y:{ grid:{display:false} } };
+        return o;
+      })()
+    });
+  } catch(e){}
+}
+
+/* ---------- Statistical results ---------- */
+function getStats(test, vkey, platform){
+  if(test==='IA'){ return DATA.stats.IA[vkey] ? DATA.stats.IA[vkey][platform] : null; }
+  var sk = TESTS[test].stats_key;
+  return DATA.stats[test][sk] ? DATA.stats[test][sk][platform] : null;
+}
+function renderStats(test){
+  var T = TESTS[test];
+  var plat = state.platform;
+  var html = '';
+  T.variants.forEach(function(v){
+      var s = getStats(test, v[0], plat);
+      if(!s) return;
+      html += '<div class="os-subhead">'+(plat==='ios'?'🍎 iOS':'🤖 Android')+' · '+v[1]+' vs Default</div>';
+      var samp = DATA.sample[test][plat];
+      if(samp){
+        html += '<div class="note-line">Primary: '+T.primary+' · MDE '+T.mde+' · Required/group '+fmtInt(samp.req)+
+          ' · ctrl '+fmtInt(samp.ctrl)+' / test '+fmtInt(samp.test)+' · '+
+          (samp.sufficient?'<span style="color:#065F46">✓ sufficient</span>':'<span style="color:#B91C1C">✗ underpowered, +'+fmtInt(samp.still_needed)+'/group needed</span>')+'</div>';
+      }
+      html += '<table class="stat-table"><thead><tr><th>Metric</th><th>Default</th><th>'+v[1]+'</th><th>Uplift</th><th>p-value</th><th>95% CI</th><th>Verdict</th></tr></thead><tbody>';
+      METRIC_ORDER.forEach(function(mk){
+        if(!s[mk]) return;
+        var m = s[mk];
+        var isPrimary = (mk===T.primary);
+        var rowCls = isPrimary?'primary-row':'';
+        if(m.sig && m.dir==='Increasing') rowCls += ' sig-pos';
+        if(m.sig && m.dir==='Decreasing') rowCls += ' sig-neg';
+        var badge, bcls;
+        if(m.sig && m.dir==='Increasing'){ badge='SIG ↑'; bcls='sig'; }
+        else if(m.sig && m.dir==='Decreasing'){ badge='SIG ↓'; bcls='signeg'; }
+        else { badge='NS'; bcls='ns'; }
+        html += '<tr class="'+rowCls+'"><td>'+(isPrimary?'★ ':'')+METRIC_LABEL[mk]+
+          (isPrimary?' <span class="badge gold">PRIMARY</span>':'')+'</td>'+
+          '<td>'+m.ctrl_mean+'</td><td>'+m.test_mean+'</td><td>'+upliftPill(m.uplift)+'</td>'+
+          '<td>'+fmtP(m.p)+'</td><td style="font-size:10px">'+m.ci+'</td>'+
+          '<td><span class="badge '+bcls+'">'+badge+'</span></td></tr>';
+      });
+      html += '</tbody></table>';
+  });
+  el('stat-mount').innerHTML = html || '<div class="note-line">No statistics for the current filter.</div>';
+  el('stat-meta').textContent = "Two-tailed Welch's t-test · α = 0.05";
+}
+function fmtP(p){
+  var f = parseFloat(p);
+  if(isNaN(f)) return p;
+  if(f===0) return '<0.0001';
+  if(f<0.001) return f.toExponential(1);
+  return f.toFixed(4);
+}
+function upliftPill(u){
+  if(u===undefined||u===null||u==='') return '—';
+  var n = parseFloat(String(u).replace('%','').replace('+',''));
+  if(isNaN(n)) return u;
+  var cls = n>0 ? 'up-pos' : n<0 ? 'up-neg' : 'up-flat';
+  return '<span class="uplift-pill '+cls+'">'+u+'</span>';
+}
+
+/* ---------- Cannibalization ---------- */
+function shortInsights(test){
+  if(test==='EM') return '<b>Employee Management:</b> Manager\'s Season Pass (Pro+Elite) leads default ($510). Test adds new premium items but several cash/energy bundles are cannibalized.';
+  if(test==='HP') return '<b>Hot Products:</b> Energy bundles surge in test (100 Energy events up sharply). Premium Racks cannibalized. Bonus mechanic shifts spend toward promoted hot products.';
+  return '<b>Intrusive Ads:</b> Android — Premium Racks down in both variants; VIP Rush surges in Purchaser. iOS — Remove Ads remains top item; some energy bundles new in EF only.';
+}
+function renderCann(test){
+  var T = TESTS[test];
+  var allRows = DATA.cann[test];
+  var hasOs = allRows.some(function(r){ return r.os; });
+  var rows = hasOs ? allRows.filter(function(r){ return r.os===state.platform; }) : allRows;
+
+  // group structure
+  var ctrlGroup = 'default';
+  var groups = [{ key:ctrlGroup, label:'Default', color:GROUP_COLORS[0] }];
+  T.variants.forEach(function(v,i){ groups.push({ key:GROUP_MAP[test][v[0]], label:v[1], color:GROUP_COLORS[(i+1)%GROUP_COLORS.length] }); });
+
+  // byName index
+  var byName = {};
+  rows.forEach(function(r){ if(!byName[r.name]) byName[r.name]={}; byName[r.name][r.group]=r; });
+  // ranked names by default revenue (then test-only)
+  var ctrlRows = rows.filter(function(r){return r.group===ctrlGroup;});
+  var ctrlSorted = ctrlRows.slice().sort(function(a,b){return b.rev-a.rev;}).map(function(r){return r.name;});
+  var newNames = []; Object.keys(byName).forEach(function(n){ if(!byName[n][ctrlGroup]) newNames.push(n); });
+  var allNames = ctrlSorted.concat(newNames);
+
+  // default placement selection = top 8 by revenue, if none chosen yet
+  if(state.cannPlacements.size===0){
+    allNames.slice(0,8).forEach(function(n){ state.cannPlacements.add(n); });
+  }
+  // keep only names valid for this platform
+  var validSel = allNames.filter(function(n){ return state.cannPlacements.has(n); });
+
+  var html = '<div class="cann-insight">📊 '+shortInsights(test)+'</div>';
+  html += '<div class="os-subhead">'+(hasOs?(state.platform==='ios'?'🍎 iOS · ':'🤖 Android · '):'')+'IAP Placement Comparison</div>';
+
+  // metric toggle + placement filter controls
+  html += '<div class="cann-controls">'+
+    '<div class="cann-metric-toggle">'+
+      '<span class="cc-label">Metric</span>'+
+      '<button class="cc-btn '+(cannMetric==='conv'?'on':'')+'" onclick="setCannMetric(\'conv\')">Conversion %</button>'+
+      '<button class="cc-btn '+(cannMetric==='rev'?'on':'')+'" onclick="setCannMetric(\'rev\')">Revenue $</button>'+
+      '<button class="cc-btn '+(cannMetric==='events'?'on':'')+'" onclick="setCannMetric(\'events\')">Purchase Events</button>'+
+    '</div>'+
+    '<div class="cann-placement-filter">'+
+      '<span class="cc-label">Placements</span>'+
+      '<button class="filter-trigger" type="button" onclick="togglePanel(\'cann\')" style="min-width:220px"><span class="selection" id="sel-cann">'+
+        (validSel.length===0?'Select placements':validSel.length+' selected')+'</span><span class="chevron">▾</span></button>'+
+      '<div class="filter-panel" id="panel-cann" style="max-height:320px"></div>'+
+    '</div>'+
+  '</div>';
+
+  // comparison chart card
+  html += '<div class="card" style="margin-bottom:14px"><div class="card-head"><h4 id="cann-chart-title">'+
+    (cannMetric==='conv'?'Placement Conversion %':cannMetric==='rev'?'Placement Revenue':'Purchase Events')+
+    ' <em>by group</em></h4><div class="card-meta">'+groups.map(function(g){return g.label;}).join(' · ')+'</div></div>'+
+    '<div class="card-body"><div class="chart-wrap" id="cann-chart-wrap" style="height:'+Math.max(220, validSel.length*38+60)+'px"><canvas id="ch-cann"></canvas></div></div>'+
+    '<div class="caption">Horizontal bars group the selected placements across Default and each variant — compare bar lengths within a placement to see cannibalization or lift.</div></div>';
+
+  // table mount (filled by updateCannView)
+  html += '<div id="cann-table-mount"></div>';
+
+  el('cann-mount').innerHTML = html;
+
+  // stash context for incremental updates
+  CANN = { test:test, byName:byName, groups:groups, allNames:allNames, ctrlGroup:ctrlGroup };
+
+  // build placement filter panel (once)
+  buildCannPanel(allNames, byName, ctrlGroup);
+
+  // draw chart + table
+  updateCannView();
+}
+
+var CANN = null;
+function updateCannView(){
+  if(!CANN) return;
+  var validSel = CANN.allNames.filter(function(n){ return state.cannPlacements.has(n); });
+  // label
+  var selEl = el('sel-cann'); if(selEl) selEl.textContent = validSel.length===0?'Select placements':validSel.length+' selected';
+  // chart title
+  var titleEl = el('cann-chart-title');
+  if(titleEl) titleEl.innerHTML = (cannMetric==='conv'?'Placement Conversion %':cannMetric==='rev'?'Placement Revenue':'Purchase Events')+' <em>by group</em>';
+  // chart height grows with selection
+  var wrap = el('cann-chart-wrap'); if(wrap) wrap.style.height = Math.max(220, validSel.length*38+60)+'px';
+  // table
+  var tm = el('cann-table-mount'); if(tm) tm.innerHTML = cannTableFiltered(CANN.test, CANN.byName, CANN.groups, validSel);
+  // chart
+  drawCannChart(CANN.byName, CANN.groups, validSel);
+}
+
+var cannMetric = 'conv';
+function setCannMetric(m){ cannMetric=m; updateCannView(); }
+
+function buildCannPanel(allNames, byName, ctrlGroup){
+  var p = el('panel-cann'); if(!p) return; p.innerHTML='';
+  // quick actions
+  var top = document.createElement('div'); top.className='opt'; top.style.borderBottom='1px solid var(--border)';
+  top.innerHTML = '<span style="font-size:11px;color:var(--ink-3)"><b>Quick:</b> <a href="#" onclick="cannQuick(\'top8\');return false;">Top 8</a> · <a href="#" onclick="cannQuick(\'all\');return false;">All</a> · <a href="#" onclick="cannQuick(\'none\');return false;">Clear</a></span>';
+  p.appendChild(top);
+  allNames.forEach(function(n){
+    var isNew = !byName[n][ctrlGroup];
+    var opt = document.createElement('div'); opt.className='opt'; opt.setAttribute('data-place', n);
+    opt.innerHTML = '<input type="checkbox" '+(state.cannPlacements.has(n)?'checked':'')+'> <span>'+n+(isNew?' <span class="new">NEW</span>':'')+'</span>';
+    opt.onclick = function(e){ if(e.target.tagName!=='INPUT'){ var cb=opt.querySelector('input'); cb.checked=!cb.checked; }
+      if(opt.querySelector('input').checked) state.cannPlacements.add(n); else state.cannPlacements.delete(n);
+      updateCannView(); };
+    p.appendChild(opt);
+  });
+}
+function syncCannChecks(){
+  var p = el('panel-cann'); if(!p) return;
+  p.querySelectorAll('.opt').forEach(function(opt){
+    var n = opt.getAttribute('data-place'); if(n===null) return;
+    var cb = opt.querySelector('input'); if(cb) cb.checked = state.cannPlacements.has(n);
+  });
+}
+function cannQuick(mode){
+  var test=state.test; var allRows=DATA.cann[test];
+  var hasOs=allRows.some(function(r){return r.os;});
+  var rows=hasOs?allRows.filter(function(r){return r.os===state.platform;}):allRows;
+  var ctrlRows=rows.filter(function(r){return r.group==='default';}).sort(function(a,b){return b.rev-a.rev;});
+  var names=ctrlRows.map(function(r){return r.name;});
+  state.cannPlacements.clear();
+  if(mode==='top8') names.slice(0,8).forEach(function(n){state.cannPlacements.add(n);});
+  else if(mode==='all'){ var all={}; rows.forEach(function(r){all[r.name]=1;}); Object.keys(all).forEach(function(n){state.cannPlacements.add(n);}); }
+  syncCannChecks(); updateCannView();
+}
+function togglePanelForce(key, open){ var p=el('panel-'+key); if(p){ if(open) p.classList.add('open'); else p.classList.remove('open'); } }
+
+function drawCannChart(byName, groups, names){
+  if(typeof Chart==='undefined') return;
+  if(charts['ch-cann']) charts['ch-cann'].destroy();
+  var cv = el('ch-cann'); if(!cv || names.length===0) return;
+  function val(rec){ if(!rec) return 0; return cannMetric==='conv'?rec.conv*100 : cannMetric==='rev'?rec.rev : rec.events; }
+  var datasets = groups.map(function(g){
+    return { label:g.label, backgroundColor:g.color, borderRadius:2, maxBarThickness:22,
+      data: names.map(function(n){ return +val(byName[n][g.key]).toFixed(cannMetric==='conv'?4:2); }) };
+  });
+  var suffix = cannMetric==='conv'?'%':''; var prefix = cannMetric==='rev'?'$':'';
+  try {
+    charts['ch-cann'] = new Chart(cv, {
+      type:'bar',
+      data:{ labels:names, datasets:datasets },
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        interaction:{ mode:'index', intersect:false },
+        plugins:{ legend:{ display:true, position:'top', labels:{ boxWidth:10, font:{size:10}, color:'#4A4337', usePointStyle:true } },
+          tooltip:{ callbacks:{ label:function(c){ return ' '+c.dataset.label+': '+prefix+(+c.parsed.x).toFixed(cannMetric==='conv'?4:cannMetric==='rev'?2:0)+suffix; } } } },
+        scales:{ x:{ grid:{color:'#E3DCCA'}, ticks:{ callback:function(v){ return prefix+(+v).toFixed(cannMetric==='conv'?2:0)+suffix; } } },
+                 y:{ grid:{display:false}, ticks:{ font:{size:10} } } } }
+    });
+  } catch(e){}
+}
+
+function cannTableFiltered(test, byName, groups, names){
+  var maxRev = 0; names.forEach(function(n){ groups.forEach(function(g){ var r=byName[n][g.key]; if(r&&r.rev>maxRev) maxRev=r.rev; }); });
+  var headCols = '<th>Placement</th>';
+  groups.forEach(function(g){ headCols += '<th colspan="4" style="text-align:center;border-left:1px solid var(--border)">'+g.label+'</th>'; });
+  var subCols = '<th></th>';
+  groups.forEach(function(g){ subCols += '<th style="border-left:1px solid var(--border)">Ev</th><th>Buy</th><th>Conv%</th><th>Rev</th>'; });
+  var html = '<div style="overflow-x:auto"><table class="cann-table"><thead><tr>'+headCols+'</tr><tr class="subhead">'+subCols+'</tr></thead><tbody>';
+  names.forEach(function(name){
+    var ctrlRec = byName[name]['default'];
+    var isNew = !ctrlRec;
+    html += '<tr><td style="max-width:210px">'+name+(isNew?' <span class="new">NEW</span>':'')+'</td>';
+    groups.forEach(function(g){
+      var r = byName[name][g.key];
+      if(r){
+        var w = maxRev>0?Math.max(2, r.rev/maxRev*48):2;
+        html += '<td style="border-left:1px solid var(--border)">'+fmtInt(r.events)+'</td><td>'+fmtInt(r.buyers)+'</td><td>'+(r.conv*100).toFixed(3)+'%</td>'+
+          '<td><span class="bar" style="width:'+w+'px;background:'+g.color+'"></span>$'+r.rev.toFixed(0)+'</td>';
+      } else {
+        html += '<td style="border-left:1px solid var(--border)">—</td><td>—</td><td>—</td><td>'+(g.key!=='default'&&ctrlRec?'<span class="absent">ABS</span>':'—')+'</td>';
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  return html;
+}
+
+/* ---------- filters ---------- */
+function buildFilterPanels(){
+  var test = state.test;
+  var T = TESTS[test];
+  // countries — only those present on the currently selected platform
+  var countries = Array.from(new Set(
+    DATA.country[test].filter(function(r){return r.os===state.platform;}).map(function(r){return r.country;})
+  )).sort();
+  // drop any selected countries that don't exist on this platform
+  Array.from(state.country).forEach(function(c){ if(countries.indexOf(c)===-1) state.country.delete(c); });
+  var cp = el('panel-country'); cp.innerHTML='';
+  // "All countries" toggle at top
+  var allOpt = document.createElement('div'); allOpt.className='opt';
+  var allChecked = state.country.size===0;
+  allOpt.innerHTML = '<input type="checkbox" '+(allChecked?'checked':'')+'> <span><b>All countries</b></span>';
+  allOpt.onclick = function(e){ state.country.clear(); syncCountryChecks(); updateSel('country','All countries'); render(); };
+  cp.appendChild(allOpt);
+  countries.forEach(function(c){
+    var opt = document.createElement('div'); opt.className='opt'; opt.setAttribute('data-country', c);
+    opt.innerHTML = '<input type="checkbox" '+(state.country.has(c)?'checked':'')+'> <span>'+c+'</span>';
+    opt.onclick = function(e){ if(e.target.tagName!=='INPUT'){ var cb=opt.querySelector('input'); cb.checked=!cb.checked; } toggleSet(state.country,c,opt.querySelector('input').checked); syncCountryChecks(); updateSel('country','All countries'); render(); };
+    cp.appendChild(opt);
+  });
+  // platforms — single select, no "All"
+  var plats = T.platforms;
+  var pp = el('panel-platform'); pp.innerHTML='';
+  plats.forEach(function(p){
+    var opt = document.createElement('div'); opt.className='opt';
+    opt.innerHTML = '<span>'+(p==='ios'?'🍎 iOS':'🤖 Android')+(state.platform===p?'  ✓':'')+'</span>';
+    opt.onclick = function(){ state.platform=p; state.cannPlacements.clear(); el('sel-platform').textContent=(p==='ios'?'iOS':'Android'); closePanels(); buildFilterPanels(); render(); };
+    pp.appendChild(opt);
+  });
+  el('sel-platform').textContent = state.platform==='ios'?'iOS':'Android';
+}
+function toggleSet(set,val,on){ if(on) set.add(val); else set.delete(val); }
+function syncCountryChecks(){
+  var cp = el('panel-country'); if(!cp) return;
+  var opts = cp.querySelectorAll('.opt');
+  opts.forEach(function(opt){
+    var c = opt.getAttribute('data-country');
+    var cb = opt.querySelector('input');
+    if(!cb) return;
+    if(c===null){ cb.checked = state.country.size===0; }       // the "All" row
+    else { cb.checked = state.country.has(c); }
+  });
+}
+function updateSel(key, allLabel){
+  var set = state[key];
+  el('sel-'+key).textContent = set.size===0 ? allLabel : (set.size===1 ? Array.from(set)[0] : set.size+' selected');
+}
+function togglePanel(key){
+  var panel = el('panel-'+key);
+  var open = panel.classList.contains('open');
+  closePanels();
+  if(!open) panel.classList.add('open');
+}
+function closePanels(){ document.querySelectorAll('.filter-panel').forEach(function(p){p.classList.remove('open');}); }
+document.addEventListener('click', function(e){ if(!e.target.closest('.filter') && !e.target.closest('.cann-placement-filter')) closePanels(); });
+
+function resetFilters(){ state.country.clear(); state.platform=TESTS[state.test].platforms[0]; state.cannPlacements.clear();
+  updateSel('country','All countries'); el('sel-platform').textContent=(state.platform==='ios'?'iOS':'Android');
+  buildFilterPanels(); render(); }
+
+/* ---------- tab switching ---------- */
+function switchTest(test){
+  state.test=test; state.country.clear(); state.platform=TESTS[test].platforms[0]; state.cannPlacements.clear();
+  document.querySelectorAll('.test-tab').forEach(function(t){ t.classList.toggle('on', t.dataset.test===test); });
+  updateSel('country','All countries'); el('sel-platform').textContent=(state.platform==='ios'?'iOS':'Android');
+  buildFilterPanels(); render();
+}
+
+/* ---------- init ---------- */
+buildFilterPanels();
+render();
+</script>
+</html>
